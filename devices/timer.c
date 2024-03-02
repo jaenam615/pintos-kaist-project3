@@ -96,10 +96,47 @@ timer_elapsed (int64_t then) {
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
+
 	
 	ASSERT (intr_get_level () == INTR_ON);
 	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+
+	ASSERT(intr_get_level() == INTR_ON);
+	printf("\n<before>\n");
+	thread_sleep(ticks);
+	printf("\nafter\n");	
+
+	// timer_interrupt(thread_current());
+
+	//INTR OFF 
+	//현재 실행되고 있는 쓰레드를 반환 thread_current()
+	// struct thread *waiting;
+	// // enum intr_level 
+	// printf("<3>\n");
+
+	// waiting = thread_current();
+	// enum intr_level old_level;
+	// printf("%d", old_level);
+	// printf("\n<4>\n");
+
+	// intr_set_level(old_level);
+	// ASSERT (intr_get_level () == INTR_OFF);
+	// printf("\n<5>\n");
+	// thread_block();
+	// printf("\n<6>\n");
+	// //시간 확인 방법
+	// // while (timer_elapsed (start) < ticks){
+	// // 	continue;
+	// // }
+	// thread_unblock(waiting);
+	// printf("<7>\n");	
+
+	//thread_unblock(뭘 언블락할지 명시해줘야함)
+
+	// ASSERT (intr_get_level () == INTR_ON);
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
 }
 
 /* Suspends execution for approximately MS milliseconds. */

@@ -62,7 +62,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
-
+void thread_sleep(ticks);
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -587,4 +587,22 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+void thread_sleep(ticks){
+	printf("\n<0>\n");
+	struct thread *t = thread_current ();	
+	// t->status = THREAD_BLOCKED;	
+	printf("\n<1>\n");
+	lock_acquire (&tid_lock);
+	printf("\n<2>\n");
+
+	// intr_disable ();
+	// printf("\n<2.5>\n");
+	// do_schedule (THREAD_BLOCKED);
+	// list_next(t);
+	printf("\n<3>\n");
+
+	// do_schedule(THREAD_BLOCKED);
+	// printf("\n<3>\n");
 }

@@ -71,7 +71,7 @@ main (void) {
 	char **argv;
 	/* Clear BSS and get machine's RAM size. */
 	bss_init ();
-
+	printf("<1>\n");
 	/* Break command line into arguments and parse options. */
 	argv = read_command_line ();
 	argv = parse_options (argv);
@@ -90,7 +90,7 @@ main (void) {
 	tss_init ();
 	gdt_init ();
 #endif
-
+	printf("<2>\n");
 	/* Initialize interrupt handlers. */
 	intr_init ();
 	timer_init ();
