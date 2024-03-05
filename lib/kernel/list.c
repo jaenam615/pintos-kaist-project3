@@ -7,6 +7,11 @@
    is the `next' link of the back header.  Their other two links
    point toward each other via the interior elements of the list.
 
+// 이중으로 연결된 목록에는 두 개의 헤더 요소가 있다.
+// 첫 번째 요소는 바로 앞의 머리와 바로 뒤의 꼬리이다. 앞쪽 헤더의 prev 링크는 뒤쪽 헤더의 '다음' 링크와 마찬가지로 null이다.
+// 다른 두 링크는 목록의 내부 요소를 통해 서로를 가리킨다.
+
+
    An empty list looks like this:
 
    +------+     +------+
@@ -25,11 +30,17 @@
    conditionals.  That's a lot simpler than the code would be
    without header elements.
 
+// 이 배열의 대칭성은 목록 처리에서 많은 특수한 경우들을 제거한다.
+// list_remove()를 보면 두 개의 포인터 할당만 필요하고 조건은 필요 없다. 헤더 요소가 없는 코드보다 훨씬 간단하다.
+
    (Because only one of the pointers in each header element is used,
    we could in fact combine them into a single header element
    without sacrificing this simplicity.  But using two separate
    elements allows us to do a little bit of checking on some
    operations, which can be valuable.) */
+
+// 각 헤더 요소에 있는 포인터 중 하나만 사용하기 때문에 실제로는 이 단순함을 희생하지 않고 하나의 헤더 요소로 결합할 수 있다.
+// 하지만 두 개의 개별 요소를 사용하면 몇 가지 작업에 대해 약간의 확을 수행할 수 있기 때문에 가치가 있을 수 있다.
 
 static bool is_sorted (struct list_elem *a, struct list_elem *b,
 		list_less_func *less, void *aux) UNUSED;
@@ -73,6 +84,8 @@ list_begin (struct list *list) {
 /* Returns the element after ELEM in its list.  If ELEM is the
    last element in its list, returns the list tail.  Results are
    undefined if ELEM is itself a list tail. */
+// elem 다음에 있는 요소를 반환한다. elem이 목록의 마지막 요소인 경우 목록 꼬리를 반한다.
+
 struct list_elem *
 list_next (struct list_elem *elem) {
 	ASSERT (is_head (elem) || is_interior (elem));
