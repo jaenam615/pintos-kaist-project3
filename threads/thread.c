@@ -15,6 +15,10 @@
 #include "userprog/process.h"
 #endif
 
+// MAX 사용하기 위해 삼항연산자 추가
+#define max(x, y) (x) > (y) ? (x) : (y)
+
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -64,6 +68,8 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
+static bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
 static tid_t allocate_tid (void);
 void thread_sleep(ticks);
@@ -211,7 +217,14 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	// list_sort(&ready_list, priority_scheduling, NULL);
 
+	if (thread_get_priority() < priority){
+
+		thread_yield();	
+	
+	}
+	// thread_set_priority(priority);
 	return tid;
 }
 
@@ -317,12 +330,26 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	// printf("%d\n", new_priority);	
+	//새 priority가 더 낮은지 확인
+	//Ready List에 더 높은 우선순위가 있다면 양보
+	struct list_elem *max_elem = list_max(&ready_list, priority_scheduling, NULL);
+	struct thread *next = list_entry(max_elem, struct thread, elem);
+	if (thread_get_priority() < next->priority){
+		// printf("<1>\n");
+		// list_sort(&ready_list, priority_scheduling, NULL);
+		// printf("%d\n", next->priority);	
+		thread_yield();	
+	
+	}
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
-	return thread_current ()->priority;
+	//donated priority가 있다면 donated priority 값으로 리턴
+	int current_priority = max(thread_current()->priority, thread_current()->donated_priority);
+	return current_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -601,17 +628,9 @@ void thread_sleep(int64_t ticks){
 	t->sleep_ticks = ticks;
 
 	old_level = intr_disable();
-	list_insert_ordered(&sleep_list, &t->elem, sleep_list_order, &t);
+	list_insert_ordered(&sleep_list, &t->elem, sleep_list_order, NULL);
 	thread_block();
 	intr_set_level(old_level);
-}
-
-static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-  const struct thread *a = list_entry (a_, struct thread, elem);
-  const struct thread *b = list_entry (b_, struct thread, elem);
-
-  return a->sleep_ticks < b->sleep_ticks;
 }
 
 void thread_wakeup(int64_t ticks){
@@ -672,4 +691,20 @@ void thread_wakeup(int64_t ticks){
 // 	// do_schedule(THREAD_BLOCKED);
 // 	// printf("\n<3>\n");
 // }
+
+static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+
+  return a->sleep_ticks < b->sleep_ticks;
+}
+
+static bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct thread *a = list_entry (a_, struct thread, elem);
+	const struct thread *b = list_entry (b_, struct thread, elem);
+
+	return a->priority > b->priority;
+}
 
