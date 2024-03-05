@@ -28,6 +28,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list sleep_list;
+
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -65,6 +67,8 @@ static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
+static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
 static tid_t allocate_tid (void);
 void thread_sleep(int64_t ticks);
 /* Returns true if T appears to point to a valid thread. */
@@ -113,6 +117,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 	/* 세마포어 컨디션 init */
 	cond_init(&cond_list);
 
@@ -614,64 +619,81 @@ allocate_tid (void) {
 }
 
 void thread_sleep(int64_t ticks){
-	struct thread *curr = thread_current ();
+
+	struct thread *t = thread_current();
 	enum intr_level old_level;
-	ASSERT (!intr_context ());
+	t->sleep_ticks = ticks;
 
-	// lock_release(&tid_lock);
-	
+	old_level = intr_disable();
+	list_insert_ordered(&sleep_list, &t->elem, sleep_list_order, &t);
+	thread_block();
+	intr_set_level(old_level);
 }
 
-void thread_wakeup(int64_t ticks)
-{
-	printf("\n<1>\n");
-	// lock_release(&tid_lock);
+static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+
+  return a->sleep_ticks < b->sleep_ticks;
 }
 
-struct lock get_lock()
-{
-	return tid_lock;
-}
-
-
-void
-mutex_sleep () 
-{
-	if (lock_held_by_current_thread)
-		lock_acquire(&tid_lock);
-	if(!list_empty(&ready_list))
-		lock_acquire(list_entry (list_pop_front (&ready_list), struct thread, elem));	
-}
-
-void
-mutex_awake()
-{
+void thread_wakeup(int64_t ticks){
+	if (list_empty(&sleep_list)){
+		return;
+	}
+	const struct list_elem *waking_up;
+	waking_up = list_front(&sleep_list);
 	enum intr_level old_level;
-	lock_release(&tid_lock);
-	old_level = intr_disable ();
-	printf("\n<2>\n");
-	do_schedule (THREAD_BLOCKED);
-	printf("\n<3>\n");
-	intr_set_level (old_level);
+
+	const struct thread *checker = list_entry(waking_up, struct thread, elem);
+
+
+	if (checker->sleep_ticks <= (ticks + timer_ticks ())){
+		waking_up = list_pop_front(&sleep_list);
+		old_level = intr_disable();
+		list_push_back(&ready_list, waking_up);
+		// list_insert_ordered(&ready_list, waking_up, value_less, NULL);
+		intr_set_level(old_level);
+	}
 }
 
-static struct thread *
-next_thread_to_run (void) {
-	if (list_empty (&ready_list))
-		return idle_thread;
-	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
-}
-// void
-// thread_yield (void) {
-// 	struct thread *curr = thread_current ();
+// void thread_sleep(int64_t ticks){
+// 	struct thread *t = thread_current ();
+// 	tid_t tid = t->tid;
+// 	struct list_elem curelem = t->elem;
 // 	enum intr_level old_level;
+// 	// enum thread_status thstatus = t->status;
 
-// 	ASSERT (!intr_context ());
+// 	printf("%d", t->status);
+// 	printf("\n<0>\n");
+	
+// 	// 
+// 	printf("\n<1>\n");
+// 	printf("\n%d\n", t->status);
+// 	lock_acquire (&tid_lock);
+// 	printf("\n%d\n", t->status);
+// 	printf("\n<1.5>\n");
+// 	old_level = intr_disable();
+// 	printf("\n%d\n", t->status);
+// 	printf("\n<1.8>\n");
+// 	t->status = THREAD_BLOCKED;		
+// 	// old_level = intr_enable();
+// 	// lock_acquire (&tid_lock);
+// 	printf("\n<2>\n");
+// 	list_insert_ordered(&sleep_list, &curelem, NULL, NULL);
+// 	// intr_disable ();
+// 	// printf("\n<2.5>\n");
+// 	// do_schedule (THREAD_BLOCKED);
+// 	// list_next(t);
+// 	printf("\n<3>\n");
+// 	// list_pop_front(&ready_list);
+	
+// 	thread_yield();
+// 	lock_release (&tid_lock);
+// 	printf("\n<4>\n");
 
-// 	old_level = intr_disable ();
-// 	if (curr != idle_thread)
-// 		list_push_back (&ready_list, &curr->elem);
-// 	do_schedule (THREAD_READY);
-// 	intr_set_level (old_level);
+// 	// do_schedule(THREAD_BLOCKED);
+// 	// printf("\n<3>\n");
 // }
+

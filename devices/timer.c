@@ -98,6 +98,41 @@ void
 timer_sleep (int64_t ticks) {
 	
 	int64_t start = timer_ticks ();
+<<<<<<< HEAD
+=======
+
+	ASSERT(intr_get_level() == INTR_ON);
+
+	thread_sleep(ticks+start);
+
+	// timer_interrupt(thread_current());
+
+	//INTR OFF 
+	//현재 실행되고 있는 쓰레드를 반환 thread_current()
+	// struct thread *waiting;
+	// // enum intr_level 
+	// printf("<3>\n");
+
+	// waiting = thread_current();
+	// enum intr_level old_level;
+	// printf("%d", old_level);
+	// printf("\n<4>\n");
+
+	// intr_set_level(old_level);
+	// ASSERT (intr_get_level () == INTR_OFF);
+	// printf("\n<5>\n");
+	// thread_block();
+	// printf("\n<6>\n");
+	// //시간 확인 방법
+	// // while (timer_elapsed (start) < ticks){
+	// // 	continue;
+	// // }
+	// thread_unblock(waiting);
+	// printf("<7>\n");	
+
+	//thread_unblock(뭘 언블락할지 명시해줘야함)
+
+>>>>>>> 25b98e7e9efa10b0548a93fe432b06106265e500
 	// ASSERT (intr_get_level () == INTR_ON);
 	mutex_sleep () ;
 }
@@ -136,6 +171,9 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	//if (list_front(&sleep_list)
+	thread_wakeup(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
