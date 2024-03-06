@@ -92,8 +92,9 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	int original_priority;				/* 원래의 우선도(priority)*/
 	int64_t sleep_ticks; 				/* 자고 있는 시간*/
-
+	bool has_lock;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -145,11 +146,14 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+<<<<<<< HEAD
 struct lock get_lock();
 void mutex_sleep();
 void mutex_awake();
 
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
+=======
+>>>>>>> 202e0632fc5d8e21bb322fd35901bacf95373d1b
 
 #endif /* threads/thread.h */
