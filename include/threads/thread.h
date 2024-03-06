@@ -91,7 +91,7 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int donated_priority;				/* 기부받은 우선도(priority)*/
+	int original_priority;				/* 원래의 우선도(priority)*/
 	int64_t sleep_ticks; 				/* 자고 있는 시간*/
 
 	/* Shared between thread.c and synch.c. */
@@ -144,5 +144,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
 
 #endif /* threads/thread.h */

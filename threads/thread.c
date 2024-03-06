@@ -219,14 +219,18 @@ thread_create (const char *name, int priority,
 	thread_unblock (t);
 	// list_sort(&ready_list, priority_scheduling, NULL);
 
+// 	if (aux != NULL && lock_held_by_current_thread(aux)){
+// 		thread_set_priority (t->priority);
+// //		thread_current()->priority = t->priority; 
+// 	}
 	if (thread_get_priority() < priority){
-
-		thread_yield();	
-	
+		thread_yield();		
 	}
 	// thread_set_priority(priority);
 	return tid;
 }
+
+
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -320,8 +324,11 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+	if (curr != idle_thread){
+		// list_push_back (&ready_list, &curr->elem);
+		//우선순위 스케쥴링
+		list_insert_ordered(&ready_list, &curr->elem, priority_scheduling, NULL);
+	}
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -340,7 +347,6 @@ thread_set_priority (int new_priority) {
 		// list_sort(&ready_list, priority_scheduling, NULL);
 		// printf("%d\n", next->priority);	
 		thread_yield();	
-	
 	}
 }
 
@@ -348,7 +354,7 @@ thread_set_priority (int new_priority) {
 int
 thread_get_priority (void) {
 	//donated priority가 있다면 donated priority 값으로 리턴
-	int current_priority = max(thread_current()->priority, thread_current()->donated_priority);
+	int current_priority = thread_current()->priority;
 	return current_priority;
 }
 
@@ -440,6 +446,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
+	t->original_priority = priority;
 	t->magic = THREAD_MAGIC;
 }
 
