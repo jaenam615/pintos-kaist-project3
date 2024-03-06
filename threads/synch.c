@@ -32,6 +32,11 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+#define max(x, y) (x) > (y) ? (x) : (y)
+
+
+static struct list lock_list;
+
 
 static bool sema_priority(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
@@ -41,6 +46,13 @@ static bool sema_priority(const struct list_elem *a_, const struct list_elem *b_
 	return a->priority > b->priority;
 }
 
+static bool lock_priority(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct lock *a = list_entry (a_, struct lock, lock_elem);
+	const struct lock *b = list_entry (b_, struct lock, lock_elem);
+
+	return a->lock_priority >= b->lock_priority;
+}
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -78,7 +90,7 @@ sema_down (struct semaphore *sema) {
 		list_insert_ordered(&sema->waiters, &thread_current()->elem, sema_priority, NULL);
 		thread_block ();
 	}
-	thread_current()->has_lock = true;
+	thread_current()->has_lock += 1;
 	sema->value--;
 	intr_set_level (old_level);
 }
@@ -128,6 +140,7 @@ sema_up (struct semaphore *sema) {
 	{	
 		thread_current()->priority = thread_current()->original_priority;
 	}
+	thread_current()->has_lock -= 1;
 	sema->value++;
 	if (sema_top_priority!=NULL && sema_top_priority->priority > thread_current()->priority)
 		thread_yield();
@@ -192,7 +205,10 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
+	list_init(&lock_list);
 	sema_init (&lock->semaphore, 1);
+	lock->lock_priority = 0;
+
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -208,12 +224,42 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
+	lock->lock_priority = max(lock->lock_priority,thread_current()->priority);
+	struct list_elem* check_elem;
+	if(!list_empty(&lock_list))
+		check_elem = list_front(&lock_list);
+	
+	bool check_lock = true;
+	while (!list_empty(&lock_list))
+	{
+		if(check_elem == &lock->lock_elem)
+		{
+			// 아무튼 뭐 진행
+			struct thread* lock_holder = lock->holder;
+			lock_holder->priority = lock->lock_priority;
+			check_lock = false;
+			break;
+		}
+		if(check_elem->next == NULL)
+		{
+			break;
+		}
+		check_elem = list_next(check_elem);
+	}
+	if (check_lock)
+	{
+		list_insert_ordered(&lock_list,&lock->lock_elem, lock_priority,NULL);
+	}
+
+	// if (!check_lock)
+	// {
+	// 	list_insert_ordered(&lock_list,&lock->lock_elem, lock_priority,NULL);
+	// }
 
 	sema_down (&lock->semaphore);
 	// if (thread_get_priority() > lock->holder->priority ){
 	// 	lock->holder->priority = thread_current()->priority; 	
 	// 	thread_yield();	
-	// }
 	lock->holder = thread_current ();
 
 }
@@ -260,7 +306,7 @@ lock_release (struct lock *lock) {
 bool
 lock_held_by_current_thread (const struct lock *lock) {
 	ASSERT (lock != NULL);
-
+	
 	return lock->holder == thread_current ();
 }
 

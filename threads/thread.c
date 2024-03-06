@@ -224,7 +224,7 @@ thread_create (const char *name, int priority,
 // //		thread_current()->priority = t->priority; 
 // 	}
 	if (thread_get_priority() < priority){
-		if(aux != NULL && thread_current()->has_lock)
+		if(aux != NULL && 0 < thread_current()->has_lock)
 		{
 			thread_current()->priority = priority;
 			// list_sort(&ready_list,priority_scheduling,NULL);
@@ -454,7 +454,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->original_priority = priority;
 	t->magic = THREAD_MAGIC;
-	t->has_lock = false;
+	t->has_lock = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

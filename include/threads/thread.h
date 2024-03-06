@@ -94,7 +94,7 @@ struct thread {
 	int priority;                       /* Priority. */
 	int original_priority;				/* 원래의 우선도(priority)*/
 	int64_t sleep_ticks; 				/* 자고 있는 시간*/
-	bool has_lock;
+	int has_lock;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
