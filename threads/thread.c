@@ -224,6 +224,11 @@ thread_create (const char *name, int priority,
 // //		thread_current()->priority = t->priority; 
 // 	}
 	if (thread_get_priority() < priority){
+		if(aux != NULL && thread_current()->has_lock)
+		{
+			thread_current()->priority = priority;
+			// list_sort(&ready_list,priority_scheduling,NULL);
+		}
 		thread_yield();		
 	}
 	// thread_set_priority(priority);
@@ -262,7 +267,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, priority_scheduling, NULL);
+	//list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -447,8 +453,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->original_priority = priority;
-	t->has_lock = false;
 	t->magic = THREAD_MAGIC;
+	t->has_lock = false;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -648,10 +654,7 @@ void thread_sleep(int64_t ticks){
 // 	const struct list_elem *waking_up;
 // 	waking_up = list_front(&sleep_list);
 // 	enum intr_level old_level;
-
-// 	const struct thread *checker = list_entry(waking_up, struct thread, elem);
-
-
+// 
 // 	if (checker->sleep_ticks <= (ticks + timer_ticks ())){
 // 		waking_up = list_pop_front(&sleep_list);
 // 		old_level = intr_disable();
