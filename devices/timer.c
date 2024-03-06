@@ -98,8 +98,6 @@ void
 timer_sleep (int64_t ticks) {
 	
 	int64_t start = timer_ticks ();
-<<<<<<< HEAD
-=======
 
 	ASSERT(intr_get_level() == INTR_ON);
 
@@ -132,9 +130,7 @@ timer_sleep (int64_t ticks) {
 
 	//thread_unblock(뭘 언블락할지 명시해줘야함)
 
->>>>>>> 25b98e7e9efa10b0548a93fe432b06106265e500
 	// ASSERT (intr_get_level () == INTR_ON);
-	mutex_sleep () ;
 }
 
 /* Suspends execution for approximately MS milliseconds. */

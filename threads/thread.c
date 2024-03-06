@@ -224,14 +224,11 @@ thread_create (const char *name, int priority,
 // //		thread_current()->priority = t->priority; 
 // 	}
 	if (thread_get_priority() < priority){
-<<<<<<< HEAD
 		if(aux != NULL && thread_current()->has_lock)
 		{
 			thread_current()->priority = priority;
 			// list_sort(&ready_list,priority_scheduling,NULL);
 		}
-=======
->>>>>>> 202e0632fc5d8e21bb322fd35901bacf95373d1b
 		thread_yield();		
 	}
 	// thread_set_priority(priority);
@@ -456,10 +453,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->original_priority = priority;
-<<<<<<< HEAD
-=======
-	t->has_lock = false;
->>>>>>> 202e0632fc5d8e21bb322fd35901bacf95373d1b
 	t->magic = THREAD_MAGIC;
 	t->has_lock = false;
 }
@@ -654,15 +647,6 @@ void thread_sleep(int64_t ticks){
 	intr_set_level(old_level);
 }
 
-<<<<<<< HEAD
-void thread_wakeup(int64_t ticks){
-	if (list_empty(&sleep_list)){
-		return;
-	}
-	const struct list_elem *waking_up;
-	waking_up = list_front(&sleep_list);
-	enum intr_level old_level;
-=======
 // void thread_wakeup(int64_t ticks){
 // 	if (list_empty(&sleep_list)){
 // 		return;
@@ -670,11 +654,7 @@ void thread_wakeup(int64_t ticks){
 // 	const struct list_elem *waking_up;
 // 	waking_up = list_front(&sleep_list);
 // 	enum intr_level old_level;
-
-// 	const struct thread *checker = list_entry(waking_up, struct thread, elem);
-
->>>>>>> 202e0632fc5d8e21bb322fd35901bacf95373d1b
-
+// 
 // 	if (checker->sleep_ticks <= (ticks + timer_ticks ())){
 // 		waking_up = list_pop_front(&sleep_list);
 // 		old_level = intr_disable();
@@ -757,7 +737,3 @@ static bool priority_scheduling(const struct list_elem *a_, const struct list_el
 
 	return a->priority > b->priority;
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> 202e0632fc5d8e21bb322fd35901bacf95373d1b

@@ -146,14 +146,8 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
-<<<<<<< HEAD
-struct lock get_lock();
-void mutex_sleep();
-void mutex_awake();
 
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
-=======
->>>>>>> 202e0632fc5d8e21bb322fd35901bacf95373d1b
 
 #endif /* threads/thread.h */
