@@ -217,17 +217,12 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
-	// list_sort(&ready_list, priority_scheduling, NULL);
 
-// 	if (aux != NULL && lock_held_by_current_thread(aux)){
-// 		thread_set_priority (t->priority);
-// //		thread_current()->priority = t->priority; 
-// 	}
 	if (thread_get_priority() < priority){
 
 		thread_yield();		
 	}
-	// thread_set_priority(priority);
+
 	return tid;
 }
 
@@ -348,9 +343,7 @@ thread_set_priority (int new_priority) {
 	struct list_elem *max_elem = list_max(&ready_list, priority_scheduling, NULL);
 	struct thread *next = list_entry(max_elem, struct thread, elem);
 	if (thread_get_priority() < next->priority){
-		// printf("<1>\n");
-		// list_sort(&ready_list, priority_scheduling, NULL);
-		// printf("%d\n", next->priority);	
+
 		thread_yield();	
 	}
 }

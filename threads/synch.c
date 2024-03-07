@@ -135,7 +135,7 @@ sema_up (struct semaphore *sema) {
 					struct thread, elem);
 		thread_unblock (sema_top_priority);
 	}
-	thread_current()->has_lock -= 1;
+	// thread_current()->has_lock -= 1;
 	sema->value++;
 	intr_set_level (old_level);
 	thread_yield();
