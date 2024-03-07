@@ -224,11 +224,7 @@ thread_create (const char *name, int priority,
 // //		thread_current()->priority = t->priority; 
 // 	}
 	if (thread_get_priority() < priority){
-		if(aux != NULL && thread_current()->has_lock > 0)
-		{
-			thread_current()->priority = priority;
-			// list_sort(&ready_list,priority_scheduling,NULL);
-		}
+
 		thread_yield();		
 	}
 	// thread_set_priority(priority);
@@ -267,6 +263,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
+
+	/* 쓰레드가 언블락되면 ready_list에 우선순위에 따라서 넣는 부분 */
 	list_insert_ordered(&ready_list, &t->elem, priority_scheduling, NULL);
 	//list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
@@ -333,6 +331,7 @@ thread_yield (void) {
 	if (curr != idle_thread){
 		// list_push_back (&ready_list, &curr->elem);
 		//우선순위 스케쥴링
+		/* yield를 할 때 현재 쓰레드를 ready_list에 우선순위에 따른 위치에 맞게 넣는 부분 */
 		list_insert_ordered(&ready_list, &curr->elem, priority_scheduling, NULL);
 	}
 	do_schedule (THREAD_READY);
@@ -455,6 +454,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->original_priority = priority;
 	t->magic = THREAD_MAGIC;
 	t->has_lock = 0;
+	t->wait_on_lock = NULL;
+	list_init(&t->donors);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -97,7 +97,9 @@ struct thread {
 	int has_lock;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-	struct list locks;					/* 해당 쓰레드가 갖고 있는 락들의 목록*/
+	struct list_elem donor_elem;
+	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
+	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
