@@ -7,4 +7,4 @@ PintOS_Project
 
 이론적으로, 핀토스는 x86-64 CPU에서 돌아갈 것입니다.
 
-[WEEK 1 WIL](https://github.com/jaenam615/pintos-kaist/blob/main/WEEK_1_WIL.md)https://github.com/jaenam615/pintos-kaist/blob/main/WEEK_1_WIL.md
+[WEEK 1 WIL](https://github.com/jaenam615/pintos-kaist/blob/main/WEEK_1_WIL.md)
