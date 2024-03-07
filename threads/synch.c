@@ -135,7 +135,7 @@ sema_up (struct semaphore *sema) {
 					struct thread, elem);
 		thread_unblock (sema_top_priority);
 	}
-	thread_current()->has_lock -= 1;
+	// thread_current()->has_lock -= 1;
 	sema->value++;
 	intr_set_level (old_level);
 	thread_yield();
@@ -279,9 +279,9 @@ lock_release (struct lock *lock) {
 			struct thread *t = list_entry(element, struct thread, donor_elem);
 			if (t->wait_on_lock == lock){
 				// list_sort(&thread_current()->donors, lock_priority, NULL);
-				//list_remove(&element);
+				list_remove(element);
 				/* check 1*/
-				list_remove(&t->donor_elem);
+				// list_remove(&t->donor_elem);
 			}
 
 			element = element->next;
