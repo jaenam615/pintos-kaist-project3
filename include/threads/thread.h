@@ -94,9 +94,12 @@ struct thread {
 	int priority;                       /* Priority. */
 	int original_priority;				/* 원래의 우선도(priority)*/
 	int64_t sleep_ticks; 				/* 자고 있는 시간*/
-	bool has_lock;
+	int has_lock;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem donor_elem;
+	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
+	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
