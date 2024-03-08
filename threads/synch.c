@@ -368,11 +368,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	sema_init (&waiter.semaphore, 0);
 	
 	waiter.sema_priority = thread_current()->priority;
-	printf("%d\n", waiter.sema_priority);
 	// list_push_back (&cond->waiters, &waiter.elem);
-	// list_sort(&cond->waiters, sema_elem_priority, NULL);
 	list_insert_ordered (&cond->waiters, &waiter.elem, sema_elem_priority, NULL);
-	// list_sort(&cond->waiters, sema_priority, NULL);
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
