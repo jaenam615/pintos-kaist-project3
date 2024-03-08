@@ -32,8 +32,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-#define max(x, y) (x) > (y) ? (x) : (y)
-
 static bool sema_priority(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
 
@@ -226,14 +224,7 @@ lock_acquire (struct lock *lock) {
 		if (now->priority> lock_holder->priority)
 		{
 			list_insert_ordered(&lock_holder->donors, &now->donor_elem, lock_priority, NULL);
-			while(now->wait_on_lock != NULL)
-			{
-				if(now->priority > now->wait_on_lock->holder->priority)
-					donate_recursion(now);
-					// now->wait_on_lock->holder->priority = now->priority;
-				else 
-					break;
-			}
+			donate_recursion(now);
 		}
 	}
 
@@ -281,10 +272,8 @@ lock_release (struct lock *lock) {
 		while(element != NULL){	
 			struct thread *t = list_entry(element, struct thread, donor_elem);
 			if (t->wait_on_lock == lock){
-				// list_sort(&thread_current()->donors, lock_priority, NULL);
 				list_remove(element);
-				/* check 1*/
-				// list_remove(&t->donor_elem);
+				break;
 			}
 
 			element = element->next;
@@ -368,8 +357,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	sema_init (&waiter.semaphore, 0);
 	
 	waiter.sema_priority = thread_current()->priority;
-	// list_push_back (&cond->waiters, &waiter.elem);
 	list_insert_ordered (&cond->waiters, &waiter.elem, sema_elem_priority, NULL);
+
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
@@ -391,7 +380,6 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	if (!list_empty (&cond->waiters))
-		// list_sort(&cond->waiters, sema_priority, NULL);
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
 }
