@@ -336,7 +336,13 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	/* priority-lower */
+	if (thread_current()->priority == thread_current()->original_priority){
+		thread_current ()->priority = new_priority;
+	} 
+
+	/* 이 줄의 추가로 priority-sema가 pass한다. 왜why?*/
+	thread_current()->original_priority = new_priority;
 	// printf("%d\n", new_priority);	
 	//새 priority가 더 낮은지 확인
 	//Ready List에 더 높은 우선순위가 있다면 양보
