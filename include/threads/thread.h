@@ -96,12 +96,11 @@ struct thread {
 	int64_t sleep_ticks; 				/* 자고 있는 시간*/
 	int has_lock;
 	/* Shared between thread.c and synch.c. */
-	struct list_elem elem; 
-	
-	/* List element. */
-	struct list donors;
-	struct list_elem d_elem;
-	struct lock* wait_lock;
+	struct list_elem elem;              /* List element. */
+	struct list_elem donor_elem;
+	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
+	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */

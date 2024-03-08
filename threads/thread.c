@@ -217,19 +217,12 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
-	// list_sort(&ready_list, priority_scheduling, NULL);
 
-// 	if (aux != NULL && lock_held_by_current_thread(aux)){
-// 		thread_set_priority (t->priority);
-// //		thread_current()->priority = t->priority; 
-// 	}
-	if (thread_get_priority() < priority)
-	{
-	
+	if (thread_get_priority() < priority){
+
 		thread_yield();		
 	}
-	
-	// thread_set_priority(priority);
+
 	return tid;
 }
 
@@ -265,6 +258,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
+
+	/* 쓰레드가 언블락되면 ready_list에 우선순위에 따라서 넣는 부분 */
 	list_insert_ordered(&ready_list, &t->elem, priority_scheduling, NULL);
 	//list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
@@ -331,6 +326,7 @@ thread_yield (void) {
 	if (curr != idle_thread){
 		// list_push_back (&ready_list, &curr->elem);
 		//우선순위 스케쥴링
+		/* yield를 할 때 현재 쓰레드를 ready_list에 우선순위에 따른 위치에 맞게 넣는 부분 */
 		list_insert_ordered(&ready_list, &curr->elem, priority_scheduling, NULL);
 	}
 	do_schedule (THREAD_READY);
@@ -347,9 +343,7 @@ thread_set_priority (int new_priority) {
 	struct list_elem *max_elem = list_max(&ready_list, priority_scheduling, NULL);
 	struct thread *next = list_entry(max_elem, struct thread, elem);
 	if (thread_get_priority() < next->priority){
-		// printf("<1>\n");
-		// list_sort(&ready_list, priority_scheduling, NULL);
-		// printf("%d\n", next->priority);	
+
 		thread_yield();	
 	}
 }
@@ -453,7 +447,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->original_priority = priority;
 	t->magic = THREAD_MAGIC;
 	t->has_lock = 0;
-	t->wait_lock = NULL;
+	t->wait_on_lock = NULL;
 	list_init(&t->donors);
 }
 

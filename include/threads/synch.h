@@ -22,6 +22,10 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 	struct list_elem lock_elem;
 	int lock_priority; /* lock중 가장 큰 우선순위 */
+
+	struct list_elem lock_elem; /* list element for locks*/
+	int lock_priority;
+
 };
 
 void lock_init (struct lock *);
