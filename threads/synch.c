@@ -50,13 +50,6 @@ static bool lock_priority(const struct list_elem *a_, const struct list_elem *b_
 	return a->priority > b->priority;
 }
 
-static bool lock_priority(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED){
-	const struct thread *a = list_entry (a_, struct thread, elem);
-	const struct thread *b = list_entry (b_, struct thread, elem);
-
-	return a->priority > b->priority;
-}
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
