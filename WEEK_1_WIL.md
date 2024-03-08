@@ -369,15 +369,261 @@ lock_list에 우리가 원하는 lock이 있다면 그 lock의 holder 쓰레드�
 
 
 해결:
+쓰레드 구조체에 기부자 명단 리스트 donors와 현재 필요한(하지만 다른 쓰레드갑 보유하고 있는) lock wait_on_lock을 추가했다. 
 
+```c
+struct thread {
+	/* Owned by thread.c. */
+	tid_t tid;                          /* Thread identifier. */
+	enum thread_status status;          /* Thread state. */
+	char name[16];                      /* Name (for debugging purposes). */
+	int priority;                       /* Priority. */
+	int original_priority;				/* 원래의 우선도(priority)*/
+	int64_t sleep_ticks; 				/* 자고 있는 시간*/
+	int has_lock;
+	/* Shared between thread.c and synch.c. */
+	struct list_elem elem;              /* List element. */
+	struct list_elem donor_elem;
+	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
+	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
+}
+```
+우선, thread_create함수에서 lock정보를 aux를 사용해 받아오는 부분을 삭제했다. 
+```c
+	if (thread_get_priority() < priority){
+		thread_yield();		
+	}
+```
 
+이후, lock_acquire함수와 lock_release함수를 변경했다. 
 
+```c
+void
+lock_acquire (struct lock *lock) {
+	ASSERT (lock != NULL);
+	ASSERT (!intr_context ());
+	ASSERT (!lock_held_by_current_thread (lock));
 
-priority-sema
+	struct thread *lock_holder;
+	struct thread *now = thread_current();
+	
+	/* 추가 구현한 부분 */
+	if (lock->holder != NULL)
+	{
+		lock_holder = lock->holder;
+		now->wait_on_lock = lock;
+		if (now->priority> lock_holder->priority)
+		{
+			list_insert_ordered(&lock_holder->donors, &now->donor_elem, lock_priority, NULL);
+			now->wait_on_lock->holder->priority = now->priority;
+		}
+	}
+	/*                   */
 
-문제:
-세마포어를 0으로 초기 설정한 후 다수의 쓰레드를 생성하는데, 이 때 이 쓰레드들은 세마포어의 대기 리스트인 sema->waiters에서 block된 상태로 세마포어의 값이 올라갈 때 까지 대기한다. 깨워질 때 우선도에 따라 풀려 ready list에 삽입되어야 한다.  
+	sema_down (&lock->semaphore);
+	thread_current()->wait_on_lock = NULL;
+	lock->holder = thread_current ();
+}
+```
+기존 함수에서 새로운 부분을 추가했는데, 이 부분에서 현재 쓰레드의 우선도와 lock holder의 우선도를 비교하여, 현재 쓰레드의 우선도가 적을 시 lock holder를 현재 쓰레드의 donors 명단에 삽입해주고, lock holder의 우선도를 현재 쓰레드(lock이 필요한 쓰레드)의 우선도로 올려주었다.  
+
+```c
+void
+lock_release (struct lock *lock) {
+	ASSERT (lock != NULL);
+	ASSERT (lock_held_by_current_thread (lock));
+
+	/* 추가 구현한 부분 */
+	if (!list_empty(&lock->holder->donors)){
+
+		struct list_elem *element;
+		element = list_front(&lock->holder->donors);
+		
+		while(element != NULL){	
+			struct thread *t = list_entry(element, struct thread, donor_elem);
+			if (t->wait_on_lock == lock){
+				list_remove(element);
+				break;
+			}
+
+			element = element->next;
+			if (element->next == NULL){
+				break;
+			}
+		}
+	} 
+	
+	if (!list_empty(&thread_current()->donors))
+	{
+		struct thread* foremost_thread = list_entry(list_front(&thread_current()->donors), struct thread, donor_elem);
+		thread_current()->priority = foremost_thread->priority;
+	}
+	else {
+		thread_current()->priority = thread_current()->original_priority;
+	}
+	/*                   */
+
+	lock->holder = NULL;
+	thread_current()->wait_on_lock = NULL;
+	sema_up (&lock->semaphore);
+
+}
+```
+lock_release에서는 release하려는 lock holder의 donors리스트를 확인 후 이를 탐색하며 현재 쓰레드가 필요로 하는 lock의 보유 쓰레드인지 찾고 이를 리스트에서 제거한다.  
+
+이후 반복문을 탈출해 조건문에 따라 추가 기부가 있다면 그 중 가장 우선도가 높은 기부자의 우선도로 현재 쓰레드의 우선도를 조정하고, 없을 시 쓰레드의 원래의 우선도로 조정한다. 
+
+마지막으로, wait_on_lock을 NULL로 변경해주면서 더 이상 기다리고 있는 lock이 없다는 것을 명확하게 해준다. 
+
+---
+
+priority-donate-nested & priority-donate-chain
+
+문제: 
+가장 높은 우선도의 쓰레드가 필요로 하는 lock의 보유자가 다른 lock을 기다리고 있을 때  
+이를 순차적으로 release하여 deadlock 상태를 예방해야 한다. 
 
 해결: 
+```c
+/* 재귀형태로 구현한 함수 for nested & chain */
+void donate_recursion(struct thread *t){
+	if(t->priority > t->wait_on_lock->holder->priority)
+		t->wait_on_lock->holder->priority = t->priority;
+	
+	if(t->wait_on_lock->holder->wait_on_lock != NULL){
+		donate_recursion(t->wait_on_lock->holder);
+	}
+}
 
+void
+lock_acquire (struct lock *lock){
+    //
+    //
+	//
+	//
+   
+   	if (lock->holder != NULL)
+	{
+		lock_holder = lock->holder;
+		now->wait_on_lock = lock;
+		/* check 2 */
+		if (now->priority> lock_holder->priority)
+		{
+			list_insert_ordered(&lock_holder->donors, &now->donor_elem, lock_priority, NULL);
+			donate_recursion(now);
+		}
+	}
+
+
+}
+```
+해당 문제는 기존에 구현한 lock_acquire에서의 우선도의 조정 과정을 재귀함수로 해석하여 여러 비슷한 문제를 한 번에 해결하였다.  
+
+donate_recursion 함수에서는 현재 쓰레드가 필요로 하는 lock이 다른 lock을 필요로 하면 연속하여 가장 높은 우선도의 쓰레드로 우선도를 조정하도록 한다. 
+
+---
+
+priority-donate-sema
+
+문제:
+가장 낮은 우선도의 쓰레드가 lock을 갖고 있고, 중간에 lock이 필요 없는 중간 우선도의 쓰레드가 생성, 이후 바로 lock을 필요로 하는 가장 높은 우선도의 쓰레드가 생성이 될 때 순차적으로 해결해야 한다. 
+
+해결: 
+기존에 구현했던 방식들이 유기적으로 작동하여 해결되었다.
+더 높은 우선도의 쓰레드가 들어올 시 양보하는 구조, lock이 필요할 시 lock holder의 우선도를 높이는 것과 release이후 도로 낮추는 구조 등이 해당 문제의 해결에 작용하였다.  
+
+---
+
+priority-donate-lower
+
+문제: 
+lock holder 쓰레드가 기부를 받아 우선도가 올라간 상태에서 우선도가 thread_set_priority를 통해 설정되면, 기부가 사라진 상태에서 이 set된 우선도로 돌아가도록 해야한다.  
+
+해결: 
+현재 기부 받은 상태면 priority를 변경하지 않도록 조건문을 추가하였고, 함수를 통해 설정된 우선도를 저장하기 위해 기존에 thread 구조체에 만들었던 original_priority 변수를 설정해주었다.   
+
+```c
+void
+thread_set_priority (int new_priority) {
+	/* priority-lower */
+	if (thread_current()->priority == thread_current()->original_priority){
+		thread_current ()->priority = new_priority;
+	} 
+
+	thread_current()->original_priority = new_priority;
+
+	//새 priority가 더 낮은지 확인
+	//Ready List에 더 높은 우선순위가 있다면 양보
+	struct list_elem *max_elem = list_max(&ready_list, priority_scheduling, NULL);
+	struct thread *next = list_entry(max_elem, struct thread, elem);
+	if (thread_get_priority() < next->priority){
+
+		thread_yield();	
+	}
+}
+```
+---
+
+priority-fifo & priority-preempt & priority-sema
+
+문제: 
+FIFO: 같은 우선순위일 때 들어온 순서로 해결되도록 해야한다. 
+PREEMPT: 높은 우선도의 쓰레드가 실제로 선점하는지 확인해야한다. 
+SEMA: sema->waiters리스트에서 높은 우선도의 순서로 나오도록 해야한다. 
+
+해결: 
+기존에 구현했던 개념들이 유기적으로 작용하여 위 세 문제는 이미 처리되었다. 
+
+---
+
+priority-condvar
+
+문제:
+
+
+해결:
+synch.c 중간에 숨어있던 semaphore_elem이라는 구조체를 활용하고자 했다.  
+여기에 우선도를 저장해줄 변수 sema_priority를 추가하여, 이를 사용해 policy에 따라 리스트에 정렬되도록 했다. 
+
+```c
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+	int sema_priority;
+};
+
+static bool sema_elem_priority(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
+	struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
+
+	return (a->sema_priority > b->sema_priority);
+}
+
+void
+cond_wait (struct condition *cond, struct lock *lock) {
+	struct semaphore_elem waiter;
+	waiter.sema_priority = NULL;
+
+	ASSERT (cond != NULL);
+	ASSERT (lock != NULL);
+	ASSERT (!intr_context ());
+	ASSERT (lock_held_by_current_thread (lock));
+
+	sema_init (&waiter.semaphore, 0);
+	/* 추가 구현한 부분 */
+	waiter.sema_priority = thread_current()->priority;
+	list_insert_ordered (&cond->waiters, &waiter.elem, sema_elem_priority, NULL);
+	/*                 */
+	lock_release (lock);
+	sema_down (&waiter.semaphore);
+	lock_acquire (lock);
+
+}
+
+
+```
+기존에 있던 정렬 정책들과 비슷하지만, elem이 속해있는 원 구조체가 semaphore_elem이기 때문에 이 형태로 찾아주고, 앞서 만든 sema_priority를 비교하여 cond->waiters리스트에 정렬된 상태로 삽입했다. 
+
+---
 
