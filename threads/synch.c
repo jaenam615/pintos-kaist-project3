@@ -35,7 +35,7 @@
 #define max(x, y) (x) > (y) ? (x) : (y)
 
 static bool sema_priority(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux){
+            void *aux UNUSED){
 	const struct thread *a = list_entry (a_, struct thread, elem);
 	const struct thread *b = list_entry (b_, struct thread, elem);
 
@@ -49,7 +49,6 @@ static bool lock_priority(const struct list_elem *a_, const struct list_elem *b_
 
 	return a->priority > b->priority;
 }
-
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -86,10 +85,8 @@ sema_down (struct semaphore *sema) {
 	while (sema->value == 0) {
 		// list_push_front (&sema->waiters, &thread_current ()->elem);
 		list_insert_ordered(&sema->waiters, &thread_current()->elem, sema_priority, NULL);
-		list_insert_ordered (&sema->waiters, &thread_current()->elem, sema_priority, NULL);
 		thread_block ();
 	}
-	thread_current()->has_lock += 1;
 	thread_current()->has_lock += 1;
 	sema->value--;
 	intr_set_level (old_level);

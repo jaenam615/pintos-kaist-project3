@@ -61,6 +61,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
+
 static void idle (void *aux UNUSED);
 static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
@@ -143,7 +144,6 @@ thread_start (void) {
 	sema_down (&idle_started);
 }
 
-
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
@@ -219,6 +219,7 @@ thread_create (const char *name, int priority,
 	thread_unblock (t);
 
 	if (thread_get_priority() < priority){
+
 		thread_yield();		
 	}
 
