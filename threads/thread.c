@@ -342,6 +342,7 @@ thread_set_priority (int new_priority) {
 	} 
 
 	/* 이 줄의 추가로 priority-sema가 pass한다. 왜why?*/
+	/* 이 줄의 추가로 priority-fifo가 pass한다. 왜why?*/
 	thread_current()->original_priority = new_priority;
 	// printf("%d\n", new_priority);	
 	//새 priority가 더 낮은지 확인
