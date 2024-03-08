@@ -684,44 +684,6 @@ void thread_wakeup(int64_t ticks) {
   intr_set_level(old_level);
 
 }
-// void thread_sleep(int64_t ticks){
-// 	struct thread *t = thread_current ();
-// 	tid_t tid = t->tid;
-// 	struct list_elem curelem = t->elem;
-// 	enum intr_level old_level;
-// 	// enum thread_status thstatus = t->status;
-
-// 	printf("%d", t->status);
-// 	printf("\n<0>\n");
-	
-// 	// 
-// 	printf("\n<1>\n");
-// 	printf("\n%d\n", t->status);
-// 	lock_acquire (&tid_lock);
-// 	printf("\n%d\n", t->status);
-// 	printf("\n<1.5>\n");
-// 	old_level = intr_disable();
-// 	printf("\n%d\n", t->status);
-// 	printf("\n<1.8>\n");
-// 	t->status = THREAD_BLOCKED;		
-// 	// old_level = intr_enable();
-// 	// lock_acquire (&tid_lock);
-// 	printf("\n<2>\n");
-// 	list_insert_ordered(&sleep_list, &curelem, NULL, NULL);
-// 	// intr_disable ();
-// 	// printf("\n<2.5>\n");
-// 	// do_schedule (THREAD_BLOCKED);
-// 	// list_next(t);
-// 	printf("\n<3>\n");
-// 	// list_pop_front(&ready_list);
-	
-// 	thread_yield();
-// 	lock_release (&tid_lock);
-// 	printf("\n<4>\n");
-
-// 	// do_schedule(THREAD_BLOCKED);
-// 	// printf("\n<3>\n");
-// }
 
 static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
