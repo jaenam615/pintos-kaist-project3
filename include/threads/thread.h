@@ -101,6 +101,10 @@ struct thread {
 	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
 	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
 
+	int nice_value;
+	int recent_cpu;
+
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
