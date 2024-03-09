@@ -141,8 +141,8 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-
-	//if (list_front(&sleep_list)
+	if(0 == timer_ticks()%TIMER_FREQ)
+		update_load_avg();
 	thread_wakeup(ticks);
 }
 

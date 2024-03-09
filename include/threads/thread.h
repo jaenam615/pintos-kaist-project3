@@ -153,4 +153,7 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 
+int read_threads();
+void update_load_avg();
+
 #endif /* threads/thread.h */
