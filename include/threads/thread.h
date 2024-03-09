@@ -98,11 +98,14 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	struct list_elem donor_elem;
+
 	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
 	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
 
 	int nice_value;
 	int recent_cpu;
+	struct list_elem th_elem;
+
 
 
 #ifdef USERPROG
@@ -157,7 +160,8 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 
-int read_threads();
-void update_load_avg();
 
+void update_load_avg();
+void update_priority();
+void calculating_recent_cpu();
 #endif /* threads/thread.h */

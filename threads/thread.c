@@ -51,7 +51,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 static struct list sleep_list;
-
+static struct list thread_list;
 /* load avg */
 static int64_t load_avg;
 
@@ -142,6 +142,7 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&sleep_list);
+	list_init (&thread_list);
 	load_avg = 0;
 	
 	/* Set up a thread structure for the running thread. */
@@ -240,9 +241,10 @@ thread_create (const char *name, int priority,
 
 	if (thread_mlfqs ==  true){
 		calculating_recent_cpu();
-		update_load_avg();
+		if (strcmp(name, "idle"))
+        	list_push_back(&thread_list, &t->th_elem);
+		// list_push_back(&thread_list,&t->elem);
 	}
-
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -441,26 +443,41 @@ thread_get_load_avg (void) {
 	return return_load_avg;
 }
 
-int
-calculating_recent_cpu(){
+void
+calculating_recent_cpu(struct thread* thread){
 	
 	ASSERT(thread_mlfqs == true);
 
-	int recent = thread_current()->recent_cpu;
+	int recent = thread->recent_cpu;
 	recent = ADD_INT(MUL_FIXED(DIV_FIXED(MUL_INT(load_avg, 2), ADD_INT(MUL_INT(load_avg, 2),1)),recent), thread_current()->nice_value);
 
-	thread_current()->recent_cpu = recent;
-
-	return recent;
+	thread->recent_cpu = recent;
+	// 모든 thread의 recent_cpu값을 갱신
 }
+
+void calculating_all_recent_cpu(){
+
+	ASSERT(thread_mlfqs == true);
+	if (list_empty(&thread_list))
+        return;
+	struct list_elem *e = list_front(&thread_list);
+    while (e != NULL) // ready + block + running - idle   th_elem
+    {
+        struct thread *t = list_entry(e, struct thread, th_elem);
+        calculating_recent_cpu(t);
+        e = e->next;
+    }
+}
+
+
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	ASSERT(thread_mlfqs == true)
-	
-	int return_value = REAL_NUMBER(MUL_INT(calculating_recent_cpu(), 100));
+	calculating_recent_cpu(thread_current());
+	int return_value = REAL_NUMBER(MUL_INT(thread_current()->recent_cpu, 100));
 
 	return return_value;
 }
