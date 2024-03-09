@@ -20,8 +20,11 @@
 #define P 17
 #define Q 14
 #define F (1 << (Q))
+
 #define FIXED_POINT(x) (x) * (F)
 #define REAL_NUMBER(x) (x) / (F)
+
+#define ROUND_TO_INT(x) (x >= 0)?((x + (F/2)) /F) : ((x - (F/2)) /F)
 
 //고정소수점 기본 연산
 #define ADD_FIXED(x,y) (x) + (y)
@@ -139,7 +142,8 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&sleep_list);
-
+	load_avg = 0;
+	
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -385,17 +389,18 @@ thread_get_priority (void) {
 int
 ready_threads()
 {
+	struct thread* t = thread_current();
+	int ready;
+
 	size_t count = list_size(&ready_list);
-	if("idle" != thread_current()->name)
-		++count;
-	return count;
+	if (t != idle_thread)
+		ready = count + 1;
+	else
+		ready = count;
+	return ready;
 }
 
-void update_load_avg(void){
-	// load_avg =  (((59 * F) /60) / F) * load_avg + (((1 * F)/60)/F) * ready_threads();
 
-	load_avg = ADD_FIXED((MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg)),(MUL_INT(DIV_INT(F,60),(ready_threads()))));
-}
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice) {
@@ -403,7 +408,7 @@ thread_set_nice (int nice) {
 	ASSERT(thread_mlfqs == true)
 
 	thread_current()->nice_value = nice;
-	int new_priority = (int)SUB_INT(SUB_FIXED(PRI_MAX*F,DIV_INT((thread_current()->recent_cpu),4)) ,(nice*2));
+	int new_priority = SUB_INT(SUB_FIXED(PRI_MAX*F,DIV_INT((thread_current()->recent_cpu),4)) ,(nice*2));
 	thread_set_priority(new_priority);
 
 }
@@ -417,11 +422,19 @@ thread_get_nice (void) {
 	return thread_current()->nice_value;
 }
 
+void 
+update_load_avg(){
+
+	load_avg = ADD_FIXED((MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg)),(MUL_INT(DIV_INT(F,60),(ready_threads()))));
+}
+
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return load_avg;
+	int return_load_avg = ROUND_TO_INT(MUL_INT((load_avg), 100));
+	
+	return return_load_avg;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
