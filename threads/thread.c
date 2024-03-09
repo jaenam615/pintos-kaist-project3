@@ -15,8 +15,23 @@
 #include "userprog/process.h"
 #endif
 
-// MAX 사용하기 위해 삼항연산자 추가
-#define max(x, y) (x) > (y) ? (x) : (y)
+// advanced scheduling 용도
+//17.14 형식의 고정소수점 표현 
+#define P 17
+#define Q 14
+#define F (1<<Q)
+#define FIXED_POINT(x) (x<<14)
+#define REAL_NUMBER(x) (x/F)
+
+//고정소수점 기본 연산
+#define ADD_FIXED(x,y) (x + y)
+#define SUB_FIXED(x,y) (x - y)
+#define MUL_FIXED(x,y) ((int64_t)x) * y / F
+#define MUL_FIXED(x,y) ((int64_t)x) / y * F
+#define ADD_FIXED_INTEGER(x, n) (x + n * F)
+#define SUB_FIXED_INTEGER(x, n) (x - n * F)
+#define MUL_FIXED_INTEGER(x, n) (x * n)
+#define DIV_FIXED_INTEGER(x, n) (x / n)
 
 
 /* Random value for struct thread's `magic' member.
@@ -32,6 +47,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 static struct list sleep_list;
+
+/* load avg */
+static int load_avg;
 
 
 /* Idle thread. */
@@ -365,29 +383,39 @@ thread_get_priority (void) {
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) {
+thread_set_nice (int nice) {
 	/* TODO: Your implementation goes here */
+	ASSERT(thread_mlfqs == true)
+
+	thread_current()->nice_value = nice;
+	int new_priority = PRI_MAX - (int)((thread_current()->recent_cpu)/4) - (nice*2);
+	thread_set_priority(new_priority);
+
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	ASSERT(thread_mlfqs == true)
+
+	return thread_current()->nice_value;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return load_avg;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	ASSERT(thread_mlfqs == true)
+
+	return (thread_current()->recent_cpu * 100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -456,6 +484,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->has_lock = 0;
 	t->wait_on_lock = NULL;
 	list_init(&t->donors);
+
+	if (thread_mlfqs == true){
+		t->nice_value = 0;
+		t->recent_cpu = 0;
+	} else {
+		t->nice_value = NULL;
+		t->recent_cpu = NULL;
+	}
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -648,22 +684,6 @@ void thread_sleep(int64_t ticks){
 	intr_set_level(old_level);
 }
 
-// void thread_wakeup(int64_t ticks){
-// 	if (list_empty(&sleep_list)){
-// 		return;
-// 	}
-// 	const struct list_elem *waking_up;
-// 	waking_up = list_front(&sleep_list);
-// 	enum intr_level old_level;
-// 
-// 	if (checker->sleep_ticks <= (ticks + timer_ticks ())){
-// 		waking_up = list_pop_front(&sleep_list);
-// 		old_level = intr_disable();
-// 		list_push_back(&ready_list, waking_up);
-// 		// list_insert_ordered(&ready_list, waking_up, value_less, NULL);
-// 		intr_set_level(old_level);
-// 	}
-// }
 
 void thread_wakeup(int64_t ticks) {
   enum intr_level old_level;
