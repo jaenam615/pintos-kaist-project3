@@ -145,7 +145,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_wakeup(ticks);
 
 	if (thread_mlfqs == true){
-		if(timer_ticks()%TIMER_FREQ == 0)
+		if(timer_ticks() % TIMER_FREQ == 0)
 			update_load_avg();
 	}
 

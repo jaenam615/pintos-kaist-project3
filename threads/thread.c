@@ -238,6 +238,11 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	if (thread_mlfqs ==  true){
+		calculating_recent_cpu();
+		update_load_avg();
+	}
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -386,19 +391,19 @@ thread_get_priority (void) {
 	return current_priority;
 }
 
-int
-ready_threads()
-{
-	struct thread* t = thread_current();
-	int ready;
+// int
+// ready_threads()
+// {
+// 	struct thread* t = thread_current();
+// 	int ready;
 
-	size_t count = list_size(&ready_list);
-	if (t != idle_thread)
-		ready = count + 1;
-	else
-		ready = count;
-	return ready;
-}
+// 	size_t count = list_size(&ready_list);
+// 	if (t != idle_thread)
+// 		ready = count + 1;
+// 	else
+// 		ready = count;
+// 	return ready;
+// }
 
 
 /* Sets the current thread's nice value to NICE. */
@@ -408,9 +413,11 @@ thread_set_nice (int nice) {
 	ASSERT(thread_mlfqs == true)
 
 	thread_current()->nice_value = nice;
-	int new_priority = SUB_INT(SUB_FIXED(PRI_MAX*F,DIV_INT((thread_current()->recent_cpu),4)) ,(nice*2));
+	// int mid_value = SUB_INT(SUB_FIXED(FIXED_POINT(PRI_MAX), DIV_INT(thread_current()->recent_cpu, 4)), (thread_current()->nice_value*2));
+	int mid_value = PRI_MAX- ROUND_TO_INT(DIV_INT(thread_current()->recent_cpu, 4)) - (thread_current()->nice_value*2);
+	// int new_priority = REAL_NUMBER(mid_value); 
+	int new_priority = mid_value; 
 	thread_set_priority(new_priority);
-
 }
 
 /* Returns the current thread's nice value. */
@@ -425,7 +432,16 @@ thread_get_nice (void) {
 void 
 update_load_avg(){
 
-	load_avg = ADD_FIXED((MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg)),(MUL_INT(DIV_INT(F,60),(ready_threads()))));
+	struct thread* t = thread_current();
+	int ready;
+
+	size_t count = list_size(&ready_list);
+	if (t != idle_thread)
+		ready = count + 1;
+	else
+		ready = count;
+
+	load_avg = ADD_FIXED((MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg)),(MUL_INT(DIV_INT(F,60),(ready))));
 }
 
 /* Returns 100 times the system load average. */
@@ -437,13 +453,28 @@ thread_get_load_avg (void) {
 	return return_load_avg;
 }
 
+int
+calculating_recent_cpu(){
+	
+	ASSERT(thread_mlfqs == true);
+
+	int recent = thread_current()->recent_cpu;
+	recent = ADD_INT(MUL_FIXED(DIV_FIXED(MUL_INT(load_avg, 2), ADD_INT(MUL_INT(load_avg, 2),1)),recent), thread_current()->nice_value);
+
+	thread_current()->recent_cpu = recent;
+
+	return recent;
+}
+
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	ASSERT(thread_mlfqs == true)
+	
+	int return_value = REAL_NUMBER(MUL_INT(calculating_recent_cpu(), 100));
 
-	return (thread_current()->recent_cpu * 100);
+	return return_value;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
