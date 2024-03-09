@@ -19,19 +19,20 @@
 //17.14 형식의 고정소수점 표현 
 #define P 17
 #define Q 14
-#define F (1<<Q)
-#define FIXED_POINT(x) (x<<14)
-#define REAL_NUMBER(x) (x/F)
+#define F (1 << (Q))
+#define FIXED_POINT(x) (x) * (F)
+#define REAL_NUMBER(x) (x) / (F)
 
 //고정소수점 기본 연산
-#define ADD_FIXED(x,y) (x + y)
-#define SUB_FIXED(x,y) (x - y)
-#define MUL_FIXED(x,y) ((int64_t)x) * y / F
-#define MUL_FIXED(x,y) ((int64_t)x) / y * F
-#define ADD_FIXED_INTEGER(x, n) (x + n * F)
-#define SUB_FIXED_INTEGER(x, n) (x - n * F)
-#define MUL_FIXED_INTEGER(x, n) (x * n)
-#define DIV_FIXED_INTEGER(x, n) (x / n)
+#define ADD_FIXED(x,y) (x) + (y)
+#define SUB_FIXED(x,y) (x) - (y)
+#define MUL_FIXED(x,y) ((int64_t)(x)) * (y) / (F)
+#define DIV_FIXED(x,y) ((int64_t)(x)) * (F) / (y)
+
+#define ADD_INT(x, n) (x) + (n) * (F)
+#define SUB_INT(x, n) (x) - (n) * (F)
+#define MUL_INT(x, n) (x) * (n)
+#define DIV_INT(x, n) (x) / (n)
 
 
 /* Random value for struct thread's `magic' member.
@@ -49,7 +50,7 @@ static struct list ready_list;
 static struct list sleep_list;
 
 /* load avg */
-static int load_avg;
+static int64_t load_avg;
 
 
 /* Idle thread. */
@@ -382,7 +383,7 @@ thread_get_priority (void) {
 }
 
 int
-read_threads()
+ready_threads()
 {
 	size_t count = list_size(&ready_list);
 	if("idle" != thread_current()->name)
@@ -391,9 +392,10 @@ read_threads()
 }
 
 void update_load_avg(void){
-	load_avg =  (((59 * F) /60) / F) * load_avg + (((1 * F)/60)/F) * read_threads(); 
-}
+	// load_avg =  (((59 * F) /60) / F) * load_avg + (((1 * F)/60)/F) * ready_threads();
 
+	load_avg = ADD_FIXED((MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg)),(MUL_INT(DIV_INT(F,60),(ready_threads()))));
+}
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice) {
@@ -401,7 +403,7 @@ thread_set_nice (int nice) {
 	ASSERT(thread_mlfqs == true)
 
 	thread_current()->nice_value = nice;
-	int new_priority = PRI_MAX - (int)((thread_current()->recent_cpu)/4) - (nice*2);
+	int new_priority = (int)SUB_INT(SUB_FIXED(PRI_MAX*F,DIV_INT((thread_current()->recent_cpu),4)) ,(nice*2));
 	thread_set_priority(new_priority);
 
 }
