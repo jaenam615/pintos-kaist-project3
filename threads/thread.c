@@ -24,7 +24,7 @@
 #define FIXED_POINT(x) (x) * (F)
 #define REAL_NUMBER(x) (x) / (F)
 
-#define ROUND_TO_INT(x) (x >= 0)?((x + (F/2)) /F) : ((x - (F/2)) /F)
+#define ROUND_TO_INT(x) (x >= 0 ? ((x + F / 2) /F) : ((x - F / 2 ) /F))
 
 //고정소수점 기본 연산
 #define ADD_FIXED(x,y) (x) + (y)
@@ -49,8 +49,9 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+struct list ready_list;
 static struct list sleep_list;
+struct list all_list;
 
 /* load avg */
 static int64_t load_avg;
@@ -91,8 +92,11 @@ static void do_schedule(int status);
 static void schedule (void);
 static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
-static bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
+static bool advanced_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
+void apply_to_all();
 static tid_t allocate_tid (void);
 void thread_sleep(ticks);
 /* Returns true if T appears to point to a valid thread. */
@@ -142,6 +146,7 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&sleep_list);
+	list_init (&all_list);
 	load_avg = 0;
 	
 	/* Set up a thread structure for the running thread. */
@@ -158,6 +163,9 @@ thread_start (void) {
 	/* Create the idle thread. */
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
+	
+	load_avg = 0;
+
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
 
 	/* Start preemptive thread scheduling. */
@@ -227,6 +235,11 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	if (thread_mlfqs == true){
+		t->priority = calculate_advanced_priority(t);
+		t->original_priority = t->priority;
+	}
+
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
@@ -238,10 +251,7 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	if (thread_mlfqs ==  true){
-		calculating_recent_cpu();
-		update_load_avg();
-	}
+
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -369,6 +379,9 @@ thread_set_priority (int new_priority) {
 		thread_current ()->priority = new_priority;
 	} 
 
+	if (thread_mlfqs == true){
+		thread_current()->priority = new_priority;
+	}
 	/* 이 줄의 추가로 priority-sema가 pass한다. 왜why?*/
 	/* 이 줄의 추가로 priority-fifo가 pass한다. 왜why?*/
 	thread_current()->original_priority = new_priority;
@@ -392,6 +405,25 @@ thread_get_priority (void) {
 
 }
 
+int calculate_advanced_priority(struct thread* t){
+
+	int advanced_priority;
+	advanced_priority = PRI_MAX - ROUND_TO_INT(DIV_INT(t->recent_cpu, 4)) - t->nice_value * 2;
+	
+	// if (advanced_priority > PRI_MAX){
+	// 	advanced_priority = PRI_MAX;
+	// } else if (advanced_priority < PRI_MIN){
+	// 	advanced_priority = PRI_MIN;
+	// }
+	
+
+	return advanced_priority;
+}
+
+void calculate_all_priority(){
+
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice) {
@@ -399,10 +431,8 @@ thread_set_nice (int nice) {
 	ASSERT(thread_mlfqs == true)
 
 	thread_current()->nice_value = nice;
-	// int mid_value = SUB_INT(SUB_FIXED(FIXED_POINT(PRI_MAX), DIV_INT(thread_current()->recent_cpu, 4)), (thread_current()->nice_value*2));
-	int mid_value = PRI_MAX- ROUND_TO_INT(DIV_INT(thread_current()->recent_cpu, 4)) - (thread_current()->nice_value*2);
-	// int new_priority = REAL_NUMBER(mid_value); 
-	int new_priority = mid_value; 
+	int new_priority = calculate_advanced_priority(thread_current());
+
 	thread_set_priority(new_priority);
 }
 
@@ -422,13 +452,13 @@ update_load_avg(){
 	struct thread* t = thread_current();
 	int ready;
 
-	size_t count = list_size(&ready_list);
-	if (t != idle_thread)
-		ready = count + 1;
-	else
-		ready = count;
+	ready = list_size(&ready_list);
 
-	load_avg = ADD_FIXED((MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg)),(MUL_INT(DIV_INT(F,60),(ready))));
+	
+	if (t != idle_thread)
+		ready ++;
+
+	load_avg = ADD_FIXED(MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg),MUL_INT(DIV_INT(F,60),ready));
 }
 
 /* Returns 100 times the system load average. */
@@ -436,22 +466,35 @@ int
 thread_get_load_avg (void) {
 	ASSERT(thread_mlfqs == true)
 	/* TODO: Your implementation goes here */
+	
 	int return_load_avg = ROUND_TO_INT(MUL_INT((load_avg), 100));
 	
 	return return_load_avg;
 }
 
 int
-calculating_recent_cpu(){
+calculating_recent_cpu(struct thread* t){
 	
 	ASSERT(thread_mlfqs == true);
 
-	int recent = thread_current()->recent_cpu;
-	recent = ADD_INT(MUL_FIXED(DIV_FIXED(MUL_INT(load_avg, 2), ADD_INT(MUL_INT(load_avg, 2),1)),recent), thread_current()->nice_value);
+	int recent = t->recent_cpu;
+	recent = ADD_INT(MUL_FIXED(DIV_FIXED(MUL_INT(load_avg, 2), ADD_INT(MUL_INT(load_avg, 2),1)),recent),t->nice_value);
 
-	thread_current()->recent_cpu = recent;
+	t->recent_cpu = recent;
 
 	return recent;
+}
+
+void calc_all_recent_cpu(){
+	if (list_empty(&all_list))
+		return;
+	
+	struct list_elem*e = list_front(&all_list);
+	struct thread *t;
+	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
+		t = list_entry(e, struct thread, all_elem);
+		t->recent_cpu = calculating_recent_cpu(t);
+	}	
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -460,7 +503,7 @@ thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	ASSERT(thread_mlfqs == true)
 	
-	int return_value = REAL_NUMBER(MUL_INT(calculating_recent_cpu(), 100));
+	int return_value = ROUND_TO_INT(MUL_INT(calculating_recent_cpu(thread_current()), 100));
 
 	return return_value;
 }
@@ -531,6 +574,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->has_lock = 0;
 	t->wait_on_lock = NULL;
 	list_init(&t->donors);
+	list_push_back(&all_list, &t->all_elem);
 
 	if (thread_mlfqs == true){
 		t->nice_value = 0;
@@ -739,7 +783,7 @@ void thread_wakeup(int64_t ticks) {
 
     if (checker->sleep_ticks <= (ticks)) {
       waking_up = list_pop_front(&sleep_list);
-      list_push_back(&ready_list, waking_up);
+      list_insert_ordered(&ready_list, waking_up, priority_scheduling, NULL);
     } else {
       break;
     }
@@ -747,6 +791,15 @@ void thread_wakeup(int64_t ticks) {
 
   intr_set_level(old_level);
 
+}
+
+void apply_to_all(){
+	struct list_elem *e;
+	struct thread *t;
+	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
+		t = list_entry(e, struct thread, all_elem);
+		calculating_recent_cpu(t);
+	}
 }
 
 static bool sleep_list_order(const struct list_elem *a_, const struct list_elem *b_,
@@ -757,7 +810,7 @@ static bool sleep_list_order(const struct list_elem *a_, const struct list_elem 
   return a->sleep_ticks < b->sleep_ticks;
 }
 
-static bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
 	const struct thread *a = list_entry (a_, struct thread, elem);
 	const struct thread *b = list_entry (b_, struct thread, elem);
@@ -765,3 +818,10 @@ static bool priority_scheduling(const struct list_elem *a_, const struct list_el
 	return a->priority > b->priority;
 }
 
+static bool advanced_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED){
+	const struct thread *a = list_entry (a_, struct thread, all_elem);
+	const struct thread *b = list_entry (b_, struct thread, all_elem);
+
+	return a->priority > b->priority;
+}
