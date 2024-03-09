@@ -378,7 +378,6 @@ thread_set_priority (int new_priority) {
 	struct list_elem *max_elem = list_max(&ready_list, priority_scheduling, NULL);
 	struct thread *next = list_entry(max_elem, struct thread, elem);
 	if (thread_get_priority() < next->priority){
-
 		thread_yield();	
 	}
 }
@@ -387,24 +386,11 @@ thread_set_priority (int new_priority) {
 int
 thread_get_priority (void) {
 	//donated priority가 있다면 donated priority 값으로 리턴
+
 	int current_priority = thread_current()->priority;
 	return current_priority;
+
 }
-
-// int
-// ready_threads()
-// {
-// 	struct thread* t = thread_current();
-// 	int ready;
-
-// 	size_t count = list_size(&ready_list);
-// 	if (t != idle_thread)
-// 		ready = count + 1;
-// 	else
-// 		ready = count;
-// 	return ready;
-// }
-
 
 /* Sets the current thread's nice value to NICE. */
 void
@@ -431,6 +417,7 @@ thread_get_nice (void) {
 
 void 
 update_load_avg(){
+	ASSERT(thread_mlfqs == true)
 
 	struct thread* t = thread_current();
 	int ready;
@@ -447,6 +434,7 @@ update_load_avg(){
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
+	ASSERT(thread_mlfqs == true)
 	/* TODO: Your implementation goes here */
 	int return_load_avg = ROUND_TO_INT(MUL_INT((load_avg), 100));
 	
@@ -547,10 +535,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	if (thread_mlfqs == true){
 		t->nice_value = 0;
 		t->recent_cpu = 0;
-	} else {
-		t->nice_value = NULL;
-		t->recent_cpu = NULL;
-	}
+	} 
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
