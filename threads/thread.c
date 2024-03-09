@@ -28,6 +28,15 @@
    Do not modify this value. */
 #define THREAD_BASIC 0xd42df210
 
+
+/* 고정 소수점을 위한 INFO*/
+typedef long FIXEDP;
+
+#define f 1<<14
+
+
+
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -54,6 +63,8 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
+
+double load_avg;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -363,6 +374,19 @@ thread_get_priority (void) {
 	return current_priority;
 }
 
+int
+read_threads()
+{
+	size_t count = list_size(&ready_list);
+	if("idle" != thread_current()->name)
+		++count;
+	return count;
+}
+
+void update_load_avg(void){
+	load_avg =  (((59 * f) /60) / f) * load_avg + (((1 * f)/60)/f) * read_threads(); 
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
@@ -380,7 +404,7 @@ thread_get_nice (void) {
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return load_avg;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -700,3 +724,4 @@ static bool priority_scheduling(const struct list_elem *a_, const struct list_el
 
 	return a->priority > b->priority;
 }
+
