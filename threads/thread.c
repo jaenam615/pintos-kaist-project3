@@ -24,6 +24,7 @@
 #define FIXED_POINT(x) (x) * (F)
 #define REAL_NUMBER(x) (x) / (F)
 
+#define ROUND_TO_INT(x) (x >= 0 ? ((x + F / 2) /F) : ((x - F / 2 ) /F))
 
 //고정소수점 기본 연산
 #define ADD_FIXED(x,y) (x) + (y)
@@ -448,11 +449,7 @@ update_load_avg(){
 	ASSERT(thread_mlfqs == true)
 	int ready = list_size(&ready_list);;
 	struct thread* t = thread_current();
-	int ready;
 
-	ready = list_size(&ready_list);
-
-	
 	if (t != idle_thread)
 		ready ++;
 
@@ -511,9 +508,9 @@ void update_all_priority()
 	ASSERT(thread_mlfqs);
 	struct list_elem *e;
 	struct thread *t;
-	for (e = list_begin(&thread_list); e != list_end(&thread_list); e = list_next(e))
+	for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
 	{
-		t = list_entry(e, struct thread, th_elem);
+		t = list_entry(e, struct thread, all_elem);
 		update_priority(t);
 	}
 }
@@ -524,8 +521,6 @@ void update_priority(struct thread *t)
 	if (t != idle_thread)
 	{
 		int _priority = PRI_MAX- ROUND_TO_INT(DIV_INT(thread_current()->recent_cpu, 4)) - (thread_current()->nice_value*2);
-		_priority = MIN(_priority, PRI_MAX);
-		_priority = MAX(_priority, PRI_MIN);
 		t->priority = _priority;
 	}
 }
@@ -601,7 +596,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	if (thread_mlfqs == true){
 		t->nice_value = 0;
 		t->recent_cpu = 0;
-		list_push_back(&thread_list, &t->th_elem);
+		list_push_back(&all_list, &t->all_elem);
 	} 
 }
 
@@ -833,7 +828,7 @@ static bool sleep_list_order(const struct list_elem *a_, const struct list_elem 
   return a->sleep_ticks < b->sleep_ticks;
 }
 
-static bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED){
 	const struct thread *a = list_entry (a_, struct thread, elem);
 	const struct thread *b = list_entry (b_, struct thread, elem);
