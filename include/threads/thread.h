@@ -170,4 +170,5 @@ bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
 
 void update_priority();
+void calculate_all_priority();
 #endif /* threads/thread.h */
