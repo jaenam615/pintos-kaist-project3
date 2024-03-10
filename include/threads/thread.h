@@ -98,6 +98,7 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	struct list_elem donor_elem;
+
 	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
 	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
 
@@ -158,6 +159,7 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 
+
 void update_load_avg();
 void apply_to_all();
 int calculating_recent_cpu(struct thread* t);
@@ -166,5 +168,7 @@ struct list ready_list;
 void calc_all_recent_cpu();
 bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
+
+void update_priority();
 void calculate_all_priority();
 #endif /* threads/thread.h */
