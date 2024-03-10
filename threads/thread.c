@@ -27,15 +27,15 @@
 #define ROUND_TO_INT(x) (x >= 0 ? ((x + F / 2) /F) : ((x - F / 2 ) /F))
 
 //고정소수점 기본 연산
-#define ADD_FIXED(x,y) (x) + (y)
-#define SUB_FIXED(x,y) (x) - (y)
-#define MUL_FIXED(x,y) ((int64_t)(x)) * (y) / (F)
-#define DIV_FIXED(x,y) ((int64_t)(x)) * (F) / (y)
+#define ADD_FIXED(x,y) ((x) + (y))
+#define SUB_FIXED(x,y) ((x) - (y))
+#define MUL_FIXED(x,y) (((int64_t)(x)) * (y) / (F))
+#define DIV_FIXED(x,y) (((int64_t)(x)) * (F) / (y))
 
-#define ADD_INT(x, n) (x) + (n) * (F)
-#define SUB_INT(x, n) (x) - (n) * (F)
-#define MUL_INT(x, n) (x) * (n)
-#define DIV_INT(x, n) (x) / (n)
+#define ADD_INT(x, n) ((x) + (n) * (F))
+#define SUB_INT(x, n) ((x) - (n) * (F))
+#define MUL_INT(x, n) ((x) * (n))
+#define DIV_INT(x, n) ((x) / (n))
 
 
 /* Random value for struct thread's `magic' member.
@@ -251,7 +251,9 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-
+	// if(thread_mlfqs == true){
+	// 	calculating_recent_cpu(t);
+	// }
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -421,7 +423,17 @@ int calculate_advanced_priority(struct thread* t){
 }
 
 void calculate_all_priority(){
-
+	if (list_empty(&all_list))
+		return;
+	
+	// calculating_recent_cpu(thread_current());
+	struct list_elem*e = list_front(&all_list);
+	struct thread *t;
+	int new_priority;
+	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
+		t = list_entry(e, struct thread, all_elem);
+		t->priority = calculate_advanced_priority(t);
+	}	
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -489,11 +501,12 @@ void calc_all_recent_cpu(){
 	if (list_empty(&all_list))
 		return;
 	
+	// calculating_recent_cpu(thread_current());
 	struct list_elem*e = list_front(&all_list);
 	struct thread *t;
 	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
 		t = list_entry(e, struct thread, all_elem);
-		t->recent_cpu = calculating_recent_cpu(t);
+		calculating_recent_cpu(t);
 	}	
 }
 
@@ -502,8 +515,10 @@ int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	ASSERT(thread_mlfqs == true)
-	
-	int return_value = ROUND_TO_INT(MUL_INT(calculating_recent_cpu(thread_current()), 100));
+	// recent-cpu 키 - 처음에 이 부분에 calculate_recent_cpu를 했으나,
+	//생각해보니 어차피 매 초 계산을 하며, 계산식이 호출될 때마다 값이 적어지는 형태여서 너무 낮게 나오는 거라고 판단
+	//계산을 덜 하도록 함수호출 대신 recent_cpu값 사용
+	int return_value = ROUND_TO_INT(MUL_INT(thread_current()->recent_cpu, 100));
 
 	return return_value;
 }
@@ -577,10 +592,15 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_push_back(&all_list, &t->all_elem);
 
 	if (thread_mlfqs == true){
-		t->nice_value = 0;
-		t->recent_cpu = 0;
-	} 
-}
+		// if (t == initial_thread){
+			t->nice_value = 0;
+			t->recent_cpu = 0;
+		// } else {
+		// 	t->nice_value = thread_get_nice();
+		// 	t->recent_cpu = thread_current()->recent_cpu;
+		// }
+	}
+ }
 
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
@@ -783,6 +803,7 @@ void thread_wakeup(int64_t ticks) {
 
     if (checker->sleep_ticks <= (ticks)) {
       waking_up = list_pop_front(&sleep_list);
+	  checker->sleep_ticks = 0;
       list_insert_ordered(&ready_list, waking_up, priority_scheduling, NULL);
     } else {
       break;

@@ -166,5 +166,5 @@ struct list ready_list;
 void calc_all_recent_cpu();
 bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
-
+void calculate_all_priority();
 #endif /* threads/thread.h */
