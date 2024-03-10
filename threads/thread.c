@@ -256,10 +256,8 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
-	if (thread_get_priority() < priority){
-
+	if (thread_get_priority() < priority)
 		thread_yield();		
-	}
 
 	return tid;
 }
@@ -434,6 +432,7 @@ thread_set_nice (int nice) {
 	int new_priority = calculate_advanced_priority(thread_current());
 
 	thread_set_priority(new_priority);
+
 }
 
 /* Returns the current thread's nice value. */
@@ -448,13 +447,9 @@ thread_get_nice (void) {
 void 
 update_load_avg(){
 	ASSERT(thread_mlfqs == true)
-
+	int ready = list_size(&ready_list);;
 	struct thread* t = thread_current();
-	int ready;
 
-	ready = list_size(&ready_list);
-
-	
 	if (t != idle_thread)
 		ready ++;
 
@@ -506,6 +501,28 @@ thread_get_recent_cpu (void) {
 	int return_value = ROUND_TO_INT(MUL_INT(calculating_recent_cpu(thread_current()), 100));
 
 	return return_value;
+}
+
+void update_all_priority()
+{
+	ASSERT(thread_mlfqs);
+	struct list_elem *e;
+	struct thread *t;
+	for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
+	{
+		t = list_entry(e, struct thread, all_elem);
+		update_priority(t);
+	}
+}
+
+void update_priority(struct thread *t)
+{
+	ASSERT(thread_mlfqs);
+	if (t != idle_thread)
+	{
+		int _priority = PRI_MAX- ROUND_TO_INT(DIV_INT(thread_current()->recent_cpu, 4)) - (thread_current()->nice_value*2);
+		t->priority = _priority;
+	}
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -579,6 +596,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	if (thread_mlfqs == true){
 		t->nice_value = 0;
 		t->recent_cpu = 0;
+		list_push_back(&all_list, &t->all_elem);
 	} 
 }
 

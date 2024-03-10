@@ -627,3 +627,144 @@ cond_wait (struct condition *cond, struct lock *lock) {
 
 ---
 
+mlfqs-load-1
+
+문제: 
+mlfqs에 대한 함수들의 프레임만 존재해서 함수들을 구현해야 했고, 
+부동소수점을 사용할 수 없기에, 실수연산을 모두 고정소수점을 사용해서 해결해 주어야 했다.
+
+
+해결:
+부동소수점이 들어가는 연산을 고정소수점으로 바꾸는 #define 매크로를 사용해서 해결해주었다.
+시스템이 얼마나 바쁜지 알려주는 thread_get_load_avg() 과 update_load_avg() 함수를 구현해주었다.
+
+```c
+#define P 17
+#define Q 14
+#define F (1 << (Q))
+
+#define FIXED_POINT(x) (x) * (F)
+#define REAL_NUMBER(x) (x) / (F)
+
+#define ROUND_TO_INT(x) (x >= 0 ? ((x + F / 2) /F) : ((x - F / 2 ) /F))
+
+//고정소수점 기본 연산
+#define ADD_FIXED(x,y) (x) + (y)
+#define SUB_FIXED(x,y) (x) - (y)
+#define MUL_FIXED(x,y) ((int64_t)(x)) * (y) / (F)
+#define DIV_FIXED(x,y) ((int64_t)(x)) * (F) / (y)
+
+#define ADD_INT(x, n) (x) + (n) * (F)
+#define SUB_INT(x, n) (x) - (n) * (F)
+#define MUL_INT(x, n) (x) * (n)
+#define DIV_INT(x, n) (x) / (n)
+
+void 
+update_load_avg(){
+	ASSERT(thread_mlfqs == true)
+	int ready = list_size(&ready_list);;
+	struct thread* t = thread_current();
+
+	if (t != idle_thread)
+		ready ++;
+
+	load_avg = ADD_FIXED(MUL_FIXED(DIV_INT(FIXED_POINT(59), 60), load_avg),MUL_INT(DIV_INT(F,60),ready));
+}
+
+/* Returns 100 times the system load average. */
+int
+thread_get_load_avg (void) {
+	ASSERT(thread_mlfqs == true)
+	
+	int return_load_avg = ROUND_TO_INT(MUL_INT((load_avg), 100));
+	
+	return return_load_avg;
+}
+
+```
+
+---
+
+mlfqs-load-60 & mlfqs-load-avg
+
+문제:
+여러개의 쓰레드가 생성되고, nice값과 recent_cpu 값을 통해서 
+쓰레드들의 load-avg값이 바뀌어야 했다.
+
+사건?:
+mlfqs-load-60의 경우 큰 문제 없이 해결이 되었는데, 
+mlfqs-load-avg의 경우 5시간 이상의 많은 시간을 잡아먹었다.
+문제를 못찾겠어서 여러 코드를 다 뜯어보다가, 
+결국 #define 매크로에서 문제가 생겼다는 것을 찾아낼 수 있었다.
+
+해결:
+전역변수 all_list와 쓰레드 구조체에 nice_vale와 recent_cpu, all_elem을 만들어주고,
+nice 갱신 함수를 구현하여 해결하였다.
+```c
+struct thread {
+	/* Owned by thread.c. */
+	tid_t tid;                          /* Thread identifier. */
+	enum thread_status status;          /* Thread state. */
+	char name[16];                      /* Name (for debugging purposes). */
+	int priority;                       /* Priority. */
+	int original_priority;				/* 원래의 우선도(priority)*/
+	int64_t sleep_ticks; 				/* 자고 있는 시간*/
+	int has_lock;
+	/* Shared between thread.c and synch.c. */
+	struct list_elem elem;              /* List element. */
+	struct list_elem donor_elem;
+
+	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
+	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
+	/* 추가 구현한 부분 */
+	int nice_value;
+	int recent_cpu;
+	struct list_elem all_elem;
+
+void
+thread_set_nice (int nice) {
+	ASSERT(thread_mlfqs == true)
+
+	thread_current()->nice_value = nice;
+	int new_priority = calculate_advanced_priority(thread_current());
+
+	thread_set_priority(new_priority);
+
+}
+
+/* Returns the current thread's nice value. */
+int
+thread_get_nice (void) {
+	ASSERT(thread_mlfqs == true)
+
+	return thread_current()->nice_value;
+}
+
+
+int
+calculating_recent_cpu(struct thread* t){
+	
+	ASSERT(thread_mlfqs == true);
+
+	int recent = t->recent_cpu;
+	recent = ADD_INT(MUL_FIXED(DIV_FIXED(MUL_INT(load_avg, 2), ADD_INT(MUL_INT(load_avg, 2),1)),recent),t->nice_value);
+
+	t->recent_cpu = recent;
+
+	return recent;
+}
+
+void calc_all_recent_cpu(){
+	if (list_empty(&all_list))
+		return;
+	
+	struct list_elem*e = list_front(&all_list);
+	struct thread *t;
+	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
+		t = list_entry(e, struct thread, all_elem);
+		t->recent_cpu = calculating_recent_cpu(t);
+	}	
+}
+```
+
+
