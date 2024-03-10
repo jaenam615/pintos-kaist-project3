@@ -151,9 +151,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 			update_load_avg();
 		}
 		if(timer_ticks() % 4 == 0)
-		{
-			calculating_all_recent_cpu();
-		}
+			calculate_recent_cpu();
 	}
 
 }
