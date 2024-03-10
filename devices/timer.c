@@ -159,8 +159,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 			// 	calculating_recent_cpu(thread_current);
 			
 			//이걸 끄면 load 60가 되고 키면 recent-1이 됨
-			calc_all_recent_cpu();
-
+			// calc_all_recent_cpu();
 			// if (!list_empty(&ready_list))
 			// 	list_sort(&ready_list, priority_scheduling, NULL);
 		}

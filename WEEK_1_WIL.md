@@ -700,6 +700,15 @@ mlfqs-load-avg의 경우 5시간 이상의 많은 시간을 잡아먹었다.
 해결:
 전역변수 all_list와 쓰레드 구조체에 nice_vale와 recent_cpu, all_elem을 만들어주고,
 nice 갱신 함수를 구현하여 해결하였다.
+
+
+---
+
+mlfqs-recent-1
+
+매우 까다로웠으며, 사실 아직도 모르는 부분이 많다고 생각한다. 
+우선, 인터럽트때마다 쓰레드의 recent cpu 값을 올려야 했으며, 계산 또한 
+
 ```c
 struct thread {
 	/* Owned by thread.c. */
