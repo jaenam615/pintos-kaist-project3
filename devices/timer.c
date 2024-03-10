@@ -146,12 +146,15 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 
 	if (thread_mlfqs == true){
 		
-		if(timer_ticks() % TIMER_FREQ == 0)
-		{
+		if(timer_ticks() % TIMER_FREQ == 0){
 			update_load_avg();
+
+			// calc_all_recent_cpu();
+			// if (!list_empty(&ready_list))
+			// 	list_sort(&ready_list, priority_scheduling, NULL);
 		}
-		if(timer_ticks() % 4 == 0)
-			calculate_recent_cpu();
+		// if(timer_ticks() % 4 == 0)
+
 	}
 
 }

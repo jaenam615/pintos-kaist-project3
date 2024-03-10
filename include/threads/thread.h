@@ -104,9 +104,7 @@ struct thread {
 
 	int nice_value;
 	int recent_cpu;
-	struct list_elem th_elem;
-
-
+	struct list_elem all_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -156,12 +154,21 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+//구현목록
 
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 
 
 void update_load_avg();
+void apply_to_all();
+int calculating_recent_cpu(struct thread* t);
+struct list all_list;
+struct list ready_list;
+void calc_all_recent_cpu();
+bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
+
 void update_priority();
 void calculating_recent_cpu();
 #endif /* threads/thread.h */
