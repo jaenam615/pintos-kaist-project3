@@ -26,6 +26,11 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+// void argument_stack(char** argv, int argc, struct intr_frame *if_);
+void argument_stack(char** argv, int argc, void** rsp);
+
+// //구현
+// static char parse_options (char **argv);
 
 /* General process initializer for initd and other process. */
 static void
@@ -50,8 +55,14 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	// // 스페이스 전 첫 부분을 실행하고자 하는 파일의 이름으로 지정
+	// // argument passing
+	char *save_ptr;
+	strtok_r (file_name, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -63,9 +74,7 @@ initd (void *f_name) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
-
 	process_init ();
-
 	if (process_exec (f_name) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
@@ -162,6 +171,7 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
+
 	char *file_name = f_name;
 	bool success;
 
@@ -176,9 +186,29 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	char *stk[64];
+   	char *token, *save_ptr;
+	int i = 0; 
+	int value;
+
+   	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+		stk[i] = token;
+		i++;
+	}
+
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	printf("hello\n");
+	argument_stack(stk, i, &_if.rsp);
+	// argument_stack(stk, i, &_if);
+	_if.R.rdi = i;
+	_if.R.rsi = (char*)_if.rsp + 8;
+
+
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+
+	// argument_stack(argv, i, &_if);
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -204,6 +234,10 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	for (int i =0; i<1000000000; i++){
+		continue;
+	}
+
 	return -1;
 }
 
@@ -637,3 +671,111 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 #endif /* VM */
+
+void argument_stack(char **parse, int count, void **rsp) // 주소를 전달받았으므로 이중 포인터 사용
+{
+    // 프로그램 이름, 인자 문자열 push
+    for (int i = count - 1; i > -1; i--)
+    {
+        for (int j = strlen(parse[i]); j > -1; j--)
+        {
+            (*rsp)--;                      // 스택 주소 감소
+            **(char **)rsp = parse[i][j]; // 주소에 문자 저장
+        }
+        parse[i] = *(char **)rsp; // parse[i]에 현재 rsp의 값 저장해둠(지금 저장한 인자가 시작하는 주소값)
+    }
+
+    // 정렬 패딩 push
+    int padding = (int)*rsp % 8;
+    for (int i = 0; i < padding; i++)
+    {
+        (*rsp)--;
+        **(uint8_t **)rsp = 0; // rsp 직전까지 값 채움
+    }
+
+    // 인자 문자열 종료를 나타내는 0 push
+    (*rsp) -= 8;
+    **(char ***)rsp = 0; // char* 타입의 0 추가
+
+    // 각 인자 문자열의 주소 push
+    for (int i = count - 1; i > -1; i--)
+    {
+        (*rsp) -= 8; // 다음 주소로 이동
+        **(char ***)rsp = parse[i]; // char* 타입의 주소 추가
+    }
+
+    // return address push
+    (*rsp) -= 8;
+    **(void ***)rsp = 0; // void* 타입의 0 추가
+}
+
+// void argument_stack (char **argv, int argc, struct intr_frame *if_){
+// 	void** stack_pointer = if_->rsp;
+// 	for (int i = argc-1; i>=0; i--){
+// 		(*stack_pointer)--;
+// 		**(char **)stack_pointer = "\0";
+// 		for (int j = strlen(argv[i]); j>=0; j--){
+// 			(*stack_pointer)--;
+// 			**(char **)stack_pointer = argv[i][j];
+// 		}
+// 		argv[i] = *(char **)stack_pointer;
+// 	}
+
+// 	int word_align = (int)*stack_pointer% 8;
+// 	for (int i= 0; i<word_align; i++){
+// 		(*stack_pointer)--;
+// 		**(uint8_t **)stack_pointer = 0;
+// 	}
+	
+// 	(*stack_pointer) -= 8;
+// 	**(char ***)stack_pointer =0;
+
+// 	for (int i= argc-1; i>=0; i--){
+// 		(*stack_pointer) -=8;
+// 		**(char ***)stack_pointer = argv[i];
+// 	}	
+
+// 	(*stack_pointer) -= 8;
+// 	**(void ***)stack_pointer = 0;
+// 	if_->rsp = (char**)stack_pointer;
+// }
+
+// void argument_stack (char **argv, int argc, struct intr_frame *if_){
+	
+// 	for (int i = argc-1; i>=0; i--){
+// 		int address_counter = strlen(argv[i]);
+// 		if->rsp -= address_counter;
+// 		if->rsp = argv[i];
+// 		if->rsp = "/0";
+// 		memcpy(if->rsp, argv[i])
+// 	}
+// }
+
+
+// void argument_stack (char **argv, int argc, struct intr_frame *if_){
+	
+// 	int minus_addr;
+// 	for (int i = argc-1; i >= 0;i-- ){
+// 		minus_addr = strlen(argv[i]) + 1; //if onearg, value = 7 
+// 		if_->rsp -= minus_addr;
+// 		memcpy(if_->rsp, argv[i], minus_addr);
+// 		argv[i] = (char *)if_->rsp;
+// 	}
+
+// 	if (if_->rsp % 8){
+// 		int word_align = if_->rsp % 8;
+// 		if_->rsp -= word_align;
+// 		memset(if_->rsp, 0, word_align);
+// 	}
+
+// 	if_->rsp -= 8;
+
+// 	for (int i = argc; i>=0; i-- ){
+// 		if_->rsp -= 8;
+// 		memcpy(if_->rsp, &argv[i], 8);
+// 	}
+
+// 	if_->rsp -= 8;
+// 	memset(if_->rsp, 0, 8);
+
+// }

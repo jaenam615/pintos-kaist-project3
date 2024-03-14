@@ -250,16 +250,12 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-
-	// if(thread_mlfqs == true){
-	// 	calculating_recent_cpu(t);
-	// }
+	// t->tf.rsp = USER_STACK;
 
 	/* Add to run queue. */
 	thread_unblock (t);
-
 	if (thread_get_priority() < priority)
-		thread_yield();		
+		try_thread_yield();		
 
 	return tid;
 }
@@ -355,6 +351,7 @@ thread_exit (void) {
    may be scheduled again immediately at the scheduler's whim. */
 void
 thread_yield (void) {
+
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
 
@@ -393,6 +390,11 @@ thread_set_priority (int new_priority) {
 	if (thread_get_priority() < next->priority){
 		thread_yield();	
 	}
+}
+
+void try_thread_yield(void){
+	if(!list_empty(&ready_list) && thread_current == idle_thread)
+		thread_yield;
 }
 
 /* Returns the current thread's priority. */
@@ -607,6 +609,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->wait_on_lock = NULL;
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
+	
+// #ifdef USERPROG
+// 	t->pml4 = pml4_create();
+// #endif
 
 	if (thread_mlfqs == true){
 		// if (t == initial_thread){
@@ -777,6 +783,7 @@ schedule (void) {
 		if (curr && curr->status == THREAD_DYING && curr != initial_thread) {
 			ASSERT (curr != next);
 			list_push_back (&destruction_req, &curr->elem);
+			// list_remove(&curr->all_elem);
 		}
 
 		/* Before switching the thread, we first save the information

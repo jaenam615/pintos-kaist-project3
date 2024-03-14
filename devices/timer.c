@@ -156,7 +156,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 		if(timer_ticks() % TIMER_FREQ == 0){
 			update_load_avg();
 			// if (cur->status == THREAD_RUNNING)
-			// 	calculating_recent_cpu(thread_current);
+				// calculating_recent_cpu(thread_current);
 			
 			//이걸 끄면 load 60가 되고 키면 recent-1이 됨
 			// calc_all_recent_cpu();
@@ -180,7 +180,7 @@ too_many_loops (unsigned loops) {
 	while (ticks == start)
 		barrier ();
 
-	/* Run LOOPS loops. */
+	/* Run LOOPS loops.
 	start = ticks;
 	busy_wait (loops);
 
