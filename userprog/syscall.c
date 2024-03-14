@@ -41,6 +41,11 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+
+	// if(!is_user_vaddr(vaddr)){
+	// 	SYS_EXIT;
+	// }
+
 	printf ("system call!\n");
 	thread_exit ();
 }

@@ -26,8 +26,7 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
-// void argument_stack(char** argv, int argc, struct intr_frame *if_);
-void argument_stack(char** argv, int argc, void** rsp);
+void argument_stack(char** argv, int argc, struct intr_frame *if_);
 
 // //구현
 // static char parse_options (char **argv);
@@ -189,7 +188,6 @@ process_exec (void *f_name) {
 	char *stk[64];
    	char *token, *save_ptr;
 	int i = 0; 
-	int value;
 
    	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
 		stk[i] = token;
@@ -199,8 +197,7 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
-	printf("hello\n");
-	argument_stack(stk, i, &_if.rsp);
+	argument_stack(stk, i, &_if);
 	// argument_stack(stk, i, &_if);
 	_if.R.rdi = i;
 	_if.R.rsi = (char*)_if.rsp + 8;
@@ -672,110 +669,32 @@ setup_stack (struct intr_frame *if_) {
 }
 #endif /* VM */
 
-void argument_stack(char **parse, int count, void **rsp) // 주소를 전달받았으므로 이중 포인터 사용
-{
-    // 프로그램 이름, 인자 문자열 push
-    for (int i = count - 1; i > -1; i--)
-    {
-        for (int j = strlen(parse[i]); j > -1; j--)
-        {
-            (*rsp)--;                      // 스택 주소 감소
-            **(char **)rsp = parse[i][j]; // 주소에 문자 저장
-        }
-        parse[i] = *(char **)rsp; // parse[i]에 현재 rsp의 값 저장해둠(지금 저장한 인자가 시작하는 주소값)
-    }
 
-    // 정렬 패딩 push
-    int padding = (int)*rsp % 8;
-    for (int i = 0; i < padding; i++)
-    {
-        (*rsp)--;
-        **(uint8_t **)rsp = 0; // rsp 직전까지 값 채움
-    }
+void argument_stack (char **argv, int argc, struct intr_frame *if_){
+	
+	int minus_addr;
+	int address = if_->rsp;
+	for (int i = argc-1; i >= 0;i-- ){
+		minus_addr = strlen(argv[i]) + 1; //if onearg, value = 7 
+		address -= minus_addr;
+		memcpy(address, argv[i], minus_addr);
+		argv[i] = (char *)address;
+	}
 
-    // 인자 문자열 종료를 나타내는 0 push
-    (*rsp) -= 8;
-    **(char ***)rsp = 0; // char* 타입의 0 추가
+	if (address % 8){
+		int word_align = address % 8;
+		address -= word_align;
+		memset(address, 0, word_align);
+	}
 
-    // 각 인자 문자열의 주소 push
-    for (int i = count - 1; i > -1; i--)
-    {
-        (*rsp) -= 8; // 다음 주소로 이동
-        **(char ***)rsp = parse[i]; // char* 타입의 주소 추가
-    }
+	address -= 8;
 
-    // return address push
-    (*rsp) -= 8;
-    **(void ***)rsp = 0; // void* 타입의 0 추가
+	for (int i = argc; i>=0; i-- ){
+		address -= 8;
+		memcpy(address, &argv[i], 8);
+	}
+
+	address -= 8;
+	memset(address, 0, 8);
+	if_->rsp = address;
 }
-
-// void argument_stack (char **argv, int argc, struct intr_frame *if_){
-// 	void** stack_pointer = if_->rsp;
-// 	for (int i = argc-1; i>=0; i--){
-// 		(*stack_pointer)--;
-// 		**(char **)stack_pointer = "\0";
-// 		for (int j = strlen(argv[i]); j>=0; j--){
-// 			(*stack_pointer)--;
-// 			**(char **)stack_pointer = argv[i][j];
-// 		}
-// 		argv[i] = *(char **)stack_pointer;
-// 	}
-
-// 	int word_align = (int)*stack_pointer% 8;
-// 	for (int i= 0; i<word_align; i++){
-// 		(*stack_pointer)--;
-// 		**(uint8_t **)stack_pointer = 0;
-// 	}
-	
-// 	(*stack_pointer) -= 8;
-// 	**(char ***)stack_pointer =0;
-
-// 	for (int i= argc-1; i>=0; i--){
-// 		(*stack_pointer) -=8;
-// 		**(char ***)stack_pointer = argv[i];
-// 	}	
-
-// 	(*stack_pointer) -= 8;
-// 	**(void ***)stack_pointer = 0;
-// 	if_->rsp = (char**)stack_pointer;
-// }
-
-// void argument_stack (char **argv, int argc, struct intr_frame *if_){
-	
-// 	for (int i = argc-1; i>=0; i--){
-// 		int address_counter = strlen(argv[i]);
-// 		if->rsp -= address_counter;
-// 		if->rsp = argv[i];
-// 		if->rsp = "/0";
-// 		memcpy(if->rsp, argv[i])
-// 	}
-// }
-
-
-// void argument_stack (char **argv, int argc, struct intr_frame *if_){
-	
-// 	int minus_addr;
-// 	for (int i = argc-1; i >= 0;i-- ){
-// 		minus_addr = strlen(argv[i]) + 1; //if onearg, value = 7 
-// 		if_->rsp -= minus_addr;
-// 		memcpy(if_->rsp, argv[i], minus_addr);
-// 		argv[i] = (char *)if_->rsp;
-// 	}
-
-// 	if (if_->rsp % 8){
-// 		int word_align = if_->rsp % 8;
-// 		if_->rsp -= word_align;
-// 		memset(if_->rsp, 0, word_align);
-// 	}
-
-// 	if_->rsp -= 8;
-
-// 	for (int i = argc; i>=0; i-- ){
-// 		if_->rsp -= 8;
-// 		memcpy(if_->rsp, &argv[i], 8);
-// 	}
-
-// 	if_->rsp -= 8;
-// 	memset(if_->rsp, 0, 8);
-
-// }
