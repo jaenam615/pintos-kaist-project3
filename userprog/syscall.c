@@ -13,12 +13,24 @@ void syscall_handler (struct intr_frame *);
 
 /* System call.
  *
+ * 사용자 프로세스가 커널 기능에 액세스하기를 원할 때마다 시스템 호출을 호출합니다. 
+ * 스켈레톤 시스템 호출 핸들러입니다. 현재는 메시지만 출력하고 사용자 프로세스를 종료합니다. 
+ * 이 프로젝트의 2부에서는 시스템 호출에 필요한 다른 모든 작업을 수행하기 위해 코드를 추가합니다.
+
  * Previously system call services was handled by the interrupt handler
  * (e.g. int 0x80 in linux). However, in x86-64, the manufacturer supplies
  * efficient path for requesting the system call, the `syscall` instruction.
  *
+ * 이전 시스템 호출 서비스는 인터럽트 핸들러에서 처리했습니다
+ * (예: 리눅스의 경우 int 0x80). 그러나 x86-64에서는 시스템 호출을 
+ * 요청하기 위한 효율적인 경로, 즉 'syscall' 명령을 제공한다.
+ * 
  * The syscall instruction works by reading the values from the the Model
- * Specific Register (MSR). For the details, see the manual. */
+ * Specific Register (MSR). For the details, see the manual. 
+ * 
+ * syscall 명령은 모델에서 값을 읽음으로써 작동합니다
+ * MSR(Specific Register). 자세한 내용은 설명서 참조 */
+ 
 
 #define MSR_STAR 0xc0000081         /* Segment selector msr */
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
