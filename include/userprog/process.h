@@ -11,6 +11,6 @@ void process_exit (void);
 void process_activate (struct thread *next);
 
 // 만든 것
-void argument_stack(char** box, int num, void ** rsp);
+void argument_stack(char** argv, int argc, struct intr_frame *if_);
 
 #endif /* userprog/process.h */

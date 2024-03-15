@@ -226,24 +226,6 @@ process_exec (void *f_name) {
 		i++;
 	}
 
-	char *stk[64];
-   	char *token, *save_ptr;
-	int i = 0; 
-
-   	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
-		stk[i] = token;
-		i++;
-	}
-
-	char *box[64];
-	char *token, *save_ptr;
-	int num = 0;
-	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr))
-	{
-		box[num] = token;
-		num++;
-	}
-	printf("%d\n",num);
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
@@ -251,7 +233,6 @@ process_exec (void *f_name) {
 	// argument_stack(stk, i, &_if);
 	_if.R.rdi = i;
 	_if.R.rsi = (char*)_if.rsp + 8;
-
 
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
@@ -327,12 +308,18 @@ process_exit (void) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
+	 * TODO: We recommend you to implement process resource cleanup here. 
+	 * TODO: 코드가 여기에 있습니다.
+	 * TODO: 프로세스 종료 메시지 구현(참조)
+	 * TODO: project2/process_termination.html).
+	 * TODO: 여기에 프로세스 리소스 정리를 구현하는 것이 좋습니다.*/
 
+	printf ("%s: exit(%d)\n", curr->name, curr->status);
 	process_cleanup ();
 }
 
 /* Free the current process's resources. */
+/* 현재 프로세스의 리소스를 확보합니다.*/
 static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
@@ -352,7 +339,13 @@ process_cleanup (void) {
 		 * process page directory.  We must activate the base page
 		 * directory before destroying the process's page
 		 * directory, or our active page directory will be one
-		 * that's been freed (and cleared). */
+		 * that's been freed (and cleared). 
+		 * 여기서 올바른 순서는 매우 중요합니다. 
+		 * 페이지 디렉토리를 전환하기 전에 cur->pagedir를 NULL로 설정해야 
+		 * 타이머 인터럽트가 프로세스 페이지 디렉토리로 다시 전환할 수 없습니다.
+		 * 프로세스의 페이지 디렉토리를 파기하기 전에 기본 페이지 디렉토리를 활성화해야 합니다. 
+		 * 그렇지 않으면 활성화된 페이지 디렉토리가 해제(및 삭제)된 디렉토리가 됩니다
+		 */
 		curr->pml4 = NULL;
 		pml4_activate (NULL);
 		pml4_destroy (pml4);
@@ -546,7 +539,7 @@ done:
 
 
 /* Checks whether PHDR describes a valid, loadable segment in
- * FILE and returns true if so, false otherwise. 
+ * FILE and returns true if so, false otherwise. y
  * PHDR에서 로드 가능한 유효한 세그먼트를 설명하는지 확인합니다
  * 파일을 입력하면 true, 그렇지 않으면 false를 반환합니다.
  */

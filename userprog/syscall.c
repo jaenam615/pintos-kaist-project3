@@ -36,6 +36,14 @@ void syscall_handler (struct intr_frame *);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
+int open (const char *file);
+bool create (const char *file, unsigned initial_size);
+void exit(int status);
+void halt(void);
+void close (int fd);
+bool remove (const char *file);
+int filesize (int fd);
+
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
@@ -44,7 +52,9 @@ syscall_init (void) {
 
 	/* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
-	 * mode stack. Therefore, we masked the FLAG_FL. */
+	 * mode stack. Therefore, we masked the FLAG_FL. 
+	 * 인터럽트 서비스 반올림은 인터럽트 서비스를 제공해서는 안 됩니다
+	 * syscall_entry가 userland 스택을 커널 모드 스택으로 스왑할 때까지. 따라서 FLAG_FL을 마스킹했습니다.*/
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
@@ -73,58 +83,94 @@ syscall_handler (struct intr_frame *f) {
 	printf ("system call!\n");
 	switch(f->R.rax){
 	case SYS_HALT:
-		halt();		
-	
+		halt();
+		break;		
+
 	case SYS_EXIT:
-		exit();
+		exit(thread_current()->status);
+		break;
 	
-	case SYS_FORK:
-		fork();
+	// case SYS_FORK:
+	// 	fork();
 
-	case SYS_EXEC:
-		exec();
+	// case SYS_EXEC:
+	// 	exec();
 
-	case SYS_WAIT:
-		wait();
+	// case SYS_WAIT:
+	// 	wait();
 
 	case SYS_CREATE:
-		create();
+		create(f->R.rdi,f->R.rsi);
 	
 	case SYS_REMOVE:
 		remove();
 
 	case SYS_OPEN:
-		open();
+		open(f->R.rdi);
 
 	case SYS_FILESIZE:
 		filesize();
 
-	case SYS_READ:
-		read();
+	// case SYS_READ:
+	// 	read();
 
-	case SYS_WRITE:
-		write();
+	// case SYS_WRITE:
+	// 	write();
 
-	case SYS_SEEK:
-		seek();
+	// case SYS_SEEK:
+	// 	seek();
 
-	case SYS_TELL:
-		tell();
+	// case SYS_TELL:
+	// 	tell();
 
 	case SYS_CLOSE:
 		close();
+	default:
+		break;
 	}
 
 
 	thread_exit ();
 }
 
-// void halt(void){
-// 	power_off();
-// }
+void halt(void){
+	power_off();
+}
 
-// void exit(int status){
+void exit(int status){
+	thread_current()->tf.R.rax = status;
+	thread_exit();
+}
 
-// }
+bool create (const char *file, unsigned initial_size)
+{
+	return filesys_create(file,initial_size);
+}
 
+int open (const char *file)
+{
+	if(filesys_open(file))
+		return 0;
+	else
+		return -1;
+}
+
+void close (int fd)
+{
+	
+}
+
+bool remove (const char *file)
+{
+	struct dir *dir = dir_open_root ();
+	bool success = dir != NULL && dir_remove (dir, file);
+	dir_close (dir);
+
+	return success;
+}
+
+int filesize (int fd)
+{
+
+}
 // pid_t fork()

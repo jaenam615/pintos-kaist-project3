@@ -368,11 +368,6 @@ thread_yield (void) {
 	intr_set_level (old_level);
 }
 
-void try_thread_yield(void){
-	if(!list_empty(&ready_list) && thread_current != idle_thread)
-		thread_yield;
-}
-
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
