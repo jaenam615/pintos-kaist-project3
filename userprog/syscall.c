@@ -39,13 +39,80 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 
-	// if(!is_user_vaddr(vaddr)){
-	// 	SYS_EXIT;
-	// }
+	if(!is_user_vaddr(f->rsp)){
+		printf("isnotvaddr\n");
+		thread_exit();
+	}
 
+	else if(f->rsp > KERN_BASE || f->rsp < 0){
+		printf("smaller\n");
+		thread_exit();
+	}
+	
+	int addr = (f->rsp + 8);
+	if (!is_user_vaddr(addr) || (addr > KERN_BASE || addr<0)) {
+		printf ("third condition\n");
+		thread_exit();
+	}
+	
 	printf ("system call!\n");
+	switch(f->R.rax){
+	case SYS_HALT:
+		halt();		
+	
+	case SYS_EXIT:
+		exit();
+	
+	case SYS_FORK:
+		fork();
+
+	case SYS_EXEC:
+		exec();
+
+	case SYS_WAIT:
+		wait();
+
+	case SYS_CREATE:
+		create();
+	
+	case SYS_REMOVE:
+		remove();
+
+	case SYS_OPEN:
+		open();
+
+	case SYS_FILESIZE:
+		filesize();
+
+	case SYS_READ:
+		read();
+
+	case SYS_WRITE:
+		write();
+
+	case SYS_SEEK:
+		seek();
+
+	case SYS_TELL:
+		tell();
+
+	case SYS_CLOSE:
+		close();
+	}
+
+
 	thread_exit ();
 }
+
+// void halt(void){
+// 	power_off();
+// }
+
+// void exit(int status){
+
+// }
+
+// pid_t fork()
