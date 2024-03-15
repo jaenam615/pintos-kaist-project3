@@ -28,8 +28,10 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
-void argument_stack(char** box, int num, void ** rsp);
+void argument_stack(char** argv, int argc, struct intr_frame *if_);
 
+// //구현
+// static char parse_options (char **argv);
 
 /* General process initializer for initd and other process. 
 	initd 및 기타 프로세스에 대한 일반 프로세스 초기화*/
@@ -66,8 +68,10 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	// // 스페이스 전 첫 부분을 실행하고자 하는 파일의 이름으로 지정
+	// // argument passing
 	char *save_ptr;
-	strtok_r(file_name, " ",&save_ptr);
+	strtok_r (file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
@@ -83,9 +87,7 @@ initd (void *f_name) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
-
 	process_init ();
-
 	if (process_exec (f_name) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
@@ -197,6 +199,7 @@ error:
 
 int
 process_exec (void *f_name) {
+
 	char *file_name = f_name;
 	bool success;
 	
@@ -214,6 +217,24 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	char *stk[64];
+   	char *token, *save_ptr;
+	int i = 0; 
+
+   	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+		stk[i] = token;
+		i++;
+	}
+
+	char *stk[64];
+   	char *token, *save_ptr;
+	int i = 0; 
+
+   	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+		stk[i] = token;
+		i++;
+	}
+
 	char *box[64];
 	char *token, *save_ptr;
 	int num = 0;
@@ -225,13 +246,16 @@ process_exec (void *f_name) {
 	printf("%d\n",num);
 	/* And then load the binary */
 	success = load (file_name, &_if);
-	
-	argument_stack(box , num ,&_if.rsp);
-	_if.R.rdi = num;
+
+	argument_stack(stk, i, &_if);
+	// argument_stack(stk, i, &_if);
+	_if.R.rdi = i;
 	_if.R.rsi = (char*)_if.rsp + 8;
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK-(uint64_t)_if.rsp, true);
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+
+	// argument_stack(argv, i, &_if);
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -289,11 +313,11 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-  for (int i = 0; i < 1000000000; i++)
-  {
-	continue;
-  }
-  return -1;
+	for (int i =0; i<1000000000; i++){
+		continue;
+	}
+
+	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -429,6 +453,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
+	
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -741,3 +766,32 @@ setup_stack (struct intr_frame *if_) {
 }
 #endif /* VM */
 
+
+void argument_stack (char **argv, int argc, struct intr_frame *if_){
+	
+	int minus_addr;
+	int address = if_->rsp;
+	for (int i = argc-1; i >= 0;i-- ){
+		minus_addr = strlen(argv[i]) + 1; //if onearg, value = 7 
+		address -= minus_addr;
+		memcpy(address, argv[i], minus_addr);
+		argv[i] = (char *)address;
+	}
+
+	if (address % 8){
+		int word_align = address % 8;
+		address -= word_align;
+		memset(address, 0, word_align);
+	}
+
+	address -= 8;
+
+	for (int i = argc; i>=0; i-- ){
+		address -= 8;
+		memcpy(address, &argv[i], 8);
+	}
+
+	address -= 8;
+	memset(address, 0, 8);
+	if_->rsp = address;
+}

@@ -18,6 +18,9 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+#define F (1 << (14))
+#define ADD_INT(x, n) ((x) + (n) * (F))
+
 /* OS가 부팅된 이후 타이머의 틱수. */
 static int64_t ticks;
 
@@ -143,17 +146,26 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	thread_wakeup(ticks);
-
+	enum intr_level  old_level;
 	if (thread_mlfqs == true){
-		
+		struct thread *cur;
+		cur = thread_current();
+		if (cur->status == THREAD_RUNNING)
+			cur->recent_cpu = ADD_INT (cur->recent_cpu, 1);
+
 		if(timer_ticks() % TIMER_FREQ == 0){
 			update_load_avg();
-
+			// if (cur->status == THREAD_RUNNING)
+				// calculating_recent_cpu(thread_current);
+			
+			//이걸 끄면 load 60가 되고 키면 recent-1이 됨
 			// calc_all_recent_cpu();
 			// if (!list_empty(&ready_list))
 			// 	list_sort(&ready_list, priority_scheduling, NULL);
 		}
-		// if(timer_ticks() % 4 == 0)
+		// if(timer_ticks() % 4 == 0){
+		// 	calculate_all_priority();
+		// }
 
 	}
 
@@ -168,7 +180,7 @@ too_many_loops (unsigned loops) {
 	while (ticks == start)
 		barrier ();
 
-	/* Run LOOPS loops. */
+	/* Run LOOPS loops.
 	start = ticks;
 	busy_wait (loops);
 
