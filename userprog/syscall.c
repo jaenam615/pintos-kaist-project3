@@ -7,9 +7,12 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/init.h"
+#include "filesys/filesys.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+bool create (const char *file, unsigned initial_size);
 
 /* System call.
  *
@@ -42,6 +45,8 @@ void
 syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 
+	char *fn_copy;
+
 	if(!is_user_vaddr(f->rsp)){
 		printf("isnotvaddr\n");
 		thread_exit();
@@ -58,61 +63,113 @@ syscall_handler (struct intr_frame *f) {
 		thread_exit();
 	}
 	
-	printf ("system call!\n");
+	// printf ("system call!\n");
 	switch(f->R.rax){
-	case SYS_HALT:
-		halt();		
-	
-	case SYS_EXIT:
-		exit();
-	
-	case SYS_FORK:
-		fork();
+		case SYS_HALT:
+			halt();
+			break;	
+				
+		case SYS_EXIT:
+			exit(f->R.rdi);
+			break;
 
-	case SYS_EXEC:
-		exec();
+		// case SYS_FORK:
+		// 	fork();
+		// 	break;
 
-	case SYS_WAIT:
-		wait();
+		// case SYS_EXEC:
+		// 	exec();
+		// 	break;
 
-	case SYS_CREATE:
-		create();
-	
-	case SYS_REMOVE:
-		remove();
+		// case SYS_WAIT:
+		// 	wait();
+		// 	break;
 
-	case SYS_OPEN:
-		open();
+		case SYS_CREATE:
+			f->R.rax = create(f->R.rdi, f->R.rsi);
+			break;
 
-	case SYS_FILESIZE:
-		filesize();
+		// case SYS_REMOVE:
+		// 	f->R.rax = remove(f->R.rdi);
+		// 	break;
 
-	case SYS_READ:
-		read();
+		// case SYS_OPEN:
+		// 	open();
+		// 	break;
 
-	case SYS_WRITE:
-		write();
+		// case SYS_FILESIZE:
+		// 	filesize();
+		// 	break;
 
-	case SYS_SEEK:
-		seek();
+		// case SYS_READ:
+		// 	read();
+		// 	break;
 
-	case SYS_TELL:
-		tell();
+		// case SYS_WRITE:
+		// 	write();
+		// 	break;
 
-	case SYS_CLOSE:
-		close();
+		// case SYS_SEEK:
+		// 	seek();
+		// 	break;
+
+		// case SYS_TELL:
+		// 	tell();
+		// 	break;
+
+		// case SYS_CLOSE:
+		// 	close();
+		// 	break;
 	}
-
-
-	thread_exit ();
+  
+	// thread_exit ();
 }
 
-// void halt(void){
-// 	power_off();
-// }
+void halt(void){
+	power_off();
+}
 
-// void exit(int status){
+void exit(int status){
+	struct thread *cur_thread = thread_current();
+	cur_thread->status = THREAD_RUNNING;
 
+	printf("%s: exit(%d)\n", thread_name(), cur_thread->status);
+	thread_exit();
+}
+
+bool
+create (const char *file, unsigned initial_size) {
+	check_address(file);
+
+	return filesys_create(file, initial_size);
+}
+
+// bool remove(const char *file) {
+// 	check_address(file);
+// 	return filesys_remove(file);
 // }
 
 // pid_t fork()
+
+// int filesize (int fd) {
+// 	return 
+// }
+
+// int write (int fd, const void *buffer, unsigned size) {
+// 	if(!fd || !buffer) {
+// 		return -1;
+// 	}
+// 	putbuf(buffer, size);
+
+// 	int byteSize = size;
+
+// 	return byteSize;
+// }
+
+void check_address(const uint64_t *addr) {
+	struct thread *cur_thread = thread_current();
+
+	if(addr == NULL || !(is_user_vaddr(addr)) || pml4_get_page(cur_thread, addr) == NULL) {
+		exit(-1);
+	}
+}
