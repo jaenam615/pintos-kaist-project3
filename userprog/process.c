@@ -297,7 +297,6 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	for (int i =0; i<1000000000; i++){
-		continue;
 	}
 
 	return -1;
@@ -306,7 +305,6 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
@@ -315,9 +313,7 @@ process_exit (void) {
 	 * TODO: 프로세스 종료 메시지 구현(참조)
 	 * TODO: project2/process_termination.html).
 	 * TODO: 여기에 프로세스 리소스 정리를 구현하는 것이 좋습니다.*/
-
-	printf ("%s: exit(%d)\n", curr->name, curr->tf.R.rax);
-	process_cleanup ();
+	return -1;
 }
 
 /* Free the current process's resources. */

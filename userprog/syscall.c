@@ -92,7 +92,7 @@ syscall_handler (struct intr_frame *f) {
 		thread_exit();
 	}
 	
-	printf ("system call!\n");
+	// printf ("system call!\n");
 	switch(f->R.rax){
 	case SYS_HALT:
 		halt();
@@ -160,7 +160,8 @@ void halt(void){
 }
 
 void exit(int status){
-	thread_current()->tf.R.rax = status;
+	struct thread *curr = thread_current ();
+	printf ("%s: exit(%d)\n", curr->name, status);
 	thread_exit();
 }
 
@@ -244,7 +245,7 @@ int read (int fd, void *buffer, unsigned size)
 	{
 		while(byte < size)
 		{
-			_buffer[byte++]=input_getc();
+			_buffer[byte++] = input_getc();
 		}
 		return byte;
 	}
@@ -255,7 +256,7 @@ int read (int fd, void *buffer, unsigned size)
 	else{
 
 	}
-
+}
 	// struct list_elem *e;
 	// struct file* f;
 	// for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
@@ -266,7 +267,6 @@ int read (int fd, void *buffer, unsigned size)
 	// 		return file_read(f,buffer,size);
 	// 	}
 	// }
-}
 
 int write (int fd, const void *buffer, unsigned size)
 {
