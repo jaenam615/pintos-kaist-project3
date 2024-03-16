@@ -165,6 +165,8 @@ void apply_to_all();
 int calculating_recent_cpu(struct thread* t);
 struct list all_list;
 struct list ready_list;
+struct list file_list;
+bool fd_table[64];
 void calc_all_recent_cpu();
 bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);

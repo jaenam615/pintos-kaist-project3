@@ -30,6 +30,7 @@ static void initd (void *f_name);
 static void __do_fork (void *);
 void argument_stack(char** argv, int argc, struct intr_frame *if_);
 
+
 // //구현
 // static char parse_options (char **argv);
 
@@ -38,6 +39,7 @@ void argument_stack(char** argv, int argc, struct intr_frame *if_);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
+	list_init(&file_list);
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -234,7 +236,7 @@ process_exec (void *f_name) {
 	_if.R.rdi = i;
 	_if.R.rsi = (char*)_if.rsp + 8;
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	// argument_stack(argv, i, &_if);
 	/* If load failed, quit. */
@@ -314,7 +316,7 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: 여기에 프로세스 리소스 정리를 구현하는 것이 좋습니다.*/
 
-	printf ("%s: exit(%d)\n", curr->name, curr->status);
+	printf ("%s: exit(%d)\n", curr->name, curr->tf.R.rax);
 	process_cleanup ();
 }
 
