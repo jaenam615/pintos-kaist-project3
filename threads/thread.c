@@ -147,6 +147,7 @@ thread_init (void) {
 	list_init (&destruction_req);
 	list_init (&sleep_list);
 	list_init (&all_list);
+	list_init (&file_list);
 	load_avg = 0;
 	
 	/* Set up a thread structure for the running thread. */
@@ -219,7 +220,7 @@ thread_print_stats (void) {
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
-thread_create (const char *name, int priority,
+ thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
 	tid_t tid;

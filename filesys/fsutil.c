@@ -64,16 +64,25 @@ fsutil_rm (char **argv) {
 
 /* Copies from the "scratch" disk, hdc or hd1:0 to file ARGV[1]
  * in the file system.
- *
+ * "스크래치" 디스크, hdc 또는 hd1:0에서 파일 시스템의 ARGV[1] 파일로 복사합니다.
+ * 
  * The current sector on the scratch disk must begin with the
  * string "PUT\0" followed by a 32-bit little-endian integer
  * indicating the file size in bytes.  Subsequent sectors hold
  * the file content.
- *
+ * 스크래치 디스크의 현재 섹터는 문자열 "PUT\0"으로 시작하여 
+ * 파일 크기(바이트)를 나타내는 32비트 little-endian 정수로 시작해야 합니다.
+ * 후속 섹터는 파일 내용을 유지합니다.
+ * 
  * The first call to this function will read starting at the
  * beginning of the scratch disk.  Later calls advance across the
  * disk.  This disk position is independent of that used for
- * fsutil_get(), so all `put's should precede all `get's. */
+ * fsutil_get(), so all `put's should precede all `get's. 
+ * 이 함수에 대한 첫 번째 호출은 스크래치 디스크의 처음부터 읽습니다. 
+ * 나중에 호출은 디스크 전체에서 진행됩니다. 
+ * 이 디스크 위치는 fsutil_get()에 사용되는 위치와는 독립적이므로 
+ * 모든 'put's가 모든 'get's보다 앞에 와야 합니다.
+ */
 void
 fsutil_put (char **argv) {
 	static disk_sector_t sector = 0;
@@ -127,16 +136,24 @@ fsutil_put (char **argv) {
 }
 
 /* Copies file FILE_NAME from the file system to the scratch disk.
+ * 파일 시스템에서 파일 시스템의 파일 이름을 스크래치 디스크로 복사합니다.
  *
  * The current sector on the scratch disk will receive "GET\0"
  * followed by the file's size in bytes as a 32-bit,
  * little-endian integer.  Subsequent sectors receive the file's
  * data.
+ * 스크래치 디스크의 현재 섹터는 "GET\0"을 받은 후 파일의 크기(바이트)는 32비트, 
+ * 작은 엔디안 정수로 표시됩니다. 이후의 섹터는 파일의 데이터를 받습니다.
  *
  * The first call to this function will write starting at the
  * beginning of the scratch disk.  Later calls advance across the
  * disk.  This disk position is independent of that used for
- * fsutil_put(), so all `put's should precede all `get's. */
+ * fsutil_put(), so all `put's should precede all `get's. 
+ * 이 함수에 대한 첫 번째 호출은 스크래치 디스크의 처음부터 기록합니다. 
+ * 나중에 호출은 디스크 전체에서 진행됩니다. 
+ * 이 디스크 위치는 fsutil_put()에 사용되는 위치와는 독립적이므로 
+ * 모든 'put's가 모든 'get's보다 앞에 와야 합니다.
+ */
 void
 fsutil_get (char **argv) {
 	static disk_sector_t sector = 0;
