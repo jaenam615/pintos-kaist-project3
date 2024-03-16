@@ -335,8 +335,9 @@ thread_tid (void) {
 void
 thread_exit (void) {
 	ASSERT (!intr_context ());
-
+	
 #ifdef USERPROG
+	// sema_up(&thread_current()->parent->process_sema);
 	process_exit ();
 #endif
 
@@ -610,9 +611,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
 	
-// #ifdef USERPROG
-// 	t->pml4 = pml4_create();
-// #endif
+	
+#ifdef USERPROG
+	sema_init(&t->process_sema, 0);
+#endif
 
 	if (thread_mlfqs == true){
 		// if (t == initial_thread){

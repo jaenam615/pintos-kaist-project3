@@ -82,8 +82,9 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
+	
 	return thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
 }
@@ -203,7 +204,7 @@ process_exec (void *f_name) {
 	_if.R.rsi = (char*)_if.rsp + 8;
 
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	// argument_stack(argv, i, &_if);
 	/* If load failed, quit. */
@@ -227,14 +228,23 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	// struct list_elem child = list_head(thread_current()->child_list); 
+	// while (child != NULL){
+	// 	list_entry()
+	// }
+	// list_entry();
+	// sema_down(&child_tid->process_sema);
+	// if ()
 	for (int i =0; i<1000000000; i++){
-		continue;
+
 	}
 
+	// if (child_tid)
+	// tid
 	return -1;
 }
 
@@ -246,8 +256,10 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	
+	// sema_up(&curr->parent->process_sema);
 	process_cleanup ();
+	// try_thread_yield();
 }
 
 /* Free the current process's resources. */
