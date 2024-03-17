@@ -10,6 +10,7 @@
 #include "intrinsic.h"
 #include "filesys/file.h"
 #include "lib/user/syscall.h"
+#include "lib/string.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -115,7 +116,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CREATE:
-		create(f->R.rdi,f->R.rsi);
+		f->R.rax = create(f->R.rdi,f->R.rsi);
 		break;
 	
 	case SYS_REMOVE:
@@ -123,7 +124,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_OPEN:
-		// open(f->R.rdi);
+		f->R.rax = open(f->R.rdi);
 		break;
 
 	case SYS_FILESIZE:
@@ -169,38 +170,36 @@ void exit(int status){
 
 bool create (const char *file, unsigned initial_size)
 {
-	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file) || *file == '\0')
+	
+	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file) || *file == '\0' )
 		exit(-1);
 	
 	bool success = filesys_create(file,initial_size);
 	return success;
 }
 
-// int open (const char *file)
-// {
-// 	struct file* f = filesys_open(file);
-
-// 	if(f != NULL)
-// 	{
-// 		int i = 3;
-// 		while(true)
-// 		{
-// 			if(fd_table[i] == false)
-// 			{
-// 				f->fd = i;
-// 				fd_table[i] = true;
-// 				list_push_back(&file_list,&f->elem);
-// 				break;
-// 			}
-// 			++i;
-// 		}
-// 		return f->fd;
-// 	}
-// 	else
-// 	{
-// 		return -1;
-// 	}
-// }
+int open (const char *file)
+{
+	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file) || *file == '\0')
+		exit(-1);
+	struct file* f = filesys_open(file);
+	// if(f != NULL)
+	// {
+	// 	int i = 3;
+	// 	while(true)
+	// 	{
+	// 		if(fd_table[i] == false)
+	// 		{
+	// 			f->fd = i;
+	// 			fd_table[i] = true;
+	// 			return i;
+	// 		}
+	// 		++i;
+	// 	}
+	// }
+	// else
+	// 	exit(-1);
+}
 
 // void close (int fd)
 // {
