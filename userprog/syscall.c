@@ -169,7 +169,11 @@ void exit(int status){
 
 bool create (const char *file, unsigned initial_size)
 {
-	return filesys_create(file,initial_size);
+	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file) || *file == '\0')
+		exit(-1);
+	
+	bool success = filesys_create(file,initial_size);
+	return success;
 }
 
 // int open (const char *file)
