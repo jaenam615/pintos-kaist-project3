@@ -39,7 +39,7 @@ void argument_stack(char** argv, int argc, struct intr_frame *if_);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
-	list_init(&file_list);
+	// list_init(&file_list);
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -305,6 +305,7 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
+	process_cleanup();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
@@ -313,7 +314,6 @@ process_exit (void) {
 	 * TODO: 프로세스 종료 메시지 구현(참조)
 	 * TODO: project2/process_termination.html).
 	 * TODO: 여기에 프로세스 리소스 정리를 구현하는 것이 좋습니다.*/
-	return -1;
 }
 
 /* Free the current process's resources. */

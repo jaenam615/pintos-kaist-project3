@@ -123,11 +123,11 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_OPEN:
-		open(f->R.rdi);
+		// open(f->R.rdi);
 		break;
 
 	case SYS_FILESIZE:
-		filesize(f->R.rdi);
+		// filesize(f->R.rdi);
 		break;
 
 	case SYS_READ:
@@ -139,15 +139,15 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_SEEK:
-		seek(f->R.rdi,f->R.rsi);
+		// seek(f->R.rdi,f->R.rsi);
 		break;
 
 	case SYS_TELL:
-		tell(f->R.rdi);
+		// tell(f->R.rdi);
 		break;
 
 	case SYS_CLOSE:
-		close(f->R.rdi);
+		// close(f->R.rdi);
 		break;
 	default:
 		break;
@@ -160,8 +160,10 @@ void halt(void){
 }
 
 void exit(int status){
-	struct thread *curr = thread_current ();
-	printf ("%s: exit(%d)\n", curr->name, status);
+	char* p_name = thread_current ()->name;
+	char* p = "\0";
+	strtok_r(p_name," ",&p);
+	printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
 }
 
@@ -170,48 +172,48 @@ bool create (const char *file, unsigned initial_size)
 	return filesys_create(file,initial_size);
 }
 
-int open (const char *file)
-{
-	struct file* f = filesys_open(file);
+// int open (const char *file)
+// {
+// 	struct file* f = filesys_open(file);
 
-	if(f != NULL)
-	{
-		int i = 3;
-		while(true)
-		{
-			if(fd_table[i] == false)
-			{
-				f->fd = i;
-				fd_table[i] = true;
-				list_push_back(&file_list,&f->elem);
-				break;
-			}
-			++i;
-		}
-		return f->fd;
-	}
-	else
-	{
-		return -1;
-	}
-}
+// 	if(f != NULL)
+// 	{
+// 		int i = 3;
+// 		while(true)
+// 		{
+// 			if(fd_table[i] == false)
+// 			{
+// 				f->fd = i;
+// 				fd_table[i] = true;
+// 				list_push_back(&file_list,&f->elem);
+// 				break;
+// 			}
+// 			++i;
+// 		}
+// 		return f->fd;
+// 	}
+// 	else
+// 	{
+// 		return -1;
+// 	}
+// }
 
-void close (int fd)
-{
-	struct list_elem *e;
-	struct file* f;
-	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	{
-		f = list_entry(e,struct file, elem);
-		if(f->fd == fd)
-		{
-			fd_table[fd] = false;
-			list_remove(e);
-			file_close(f);
-			break;
-		}
-	}
-}
+// void close (int fd)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			fd_table[fd] = false;
+// 			list_remove(e);
+// 			file_close(f);
+// 			break;
+// 		}
+// 	}
+// }
 
 bool remove (const char *file)
 {
@@ -222,20 +224,20 @@ bool remove (const char *file)
 	return success;
 }
 
-int filesize (int fd)
-{
-	struct list_elem *e;
-	struct file* f;
-	int ret = 0;
-	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	{
-		f = list_entry(e,struct file, elem);
-		if(f->fd == fd)
-		{
-			return file_length(f);
-		}
-	}
-}
+// int filesize (int fd)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	int ret = 0;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			return file_length(f);
+// 		}
+// 	}
+// }
 
 int read (int fd, void *buffer, unsigned size)
 {
@@ -286,34 +288,34 @@ int write (int fd, const void *buffer, unsigned size)
 	}
 }
 
-void seek (int fd, unsigned position)
-{
-	struct list_elem *e;
-	struct file* f;
-	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	{
-		f = list_entry(e,struct file, elem);
-		if(f->fd == fd)
-		{
-			file_seek(f,position);
-			break;
-		}
-	}
-}
+// void seek (int fd, unsigned position)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			file_seek(f,position);
+// 			break;
+// 		}
+// 	}
+// }
 
-unsigned tell (int fd)
-{
-	struct list_elem *e;
-	struct file* f;
-	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	{
-		f = list_entry(e,struct file, elem);
-		if(f->fd == fd)
-		{
-			return file_tell(f);
-		}
-	}
-}
+// unsigned tell (int fd)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			return file_tell(f);
+// 		}
+// 	}
+// }
 
 pid_t fork (const char *thread_name)
 {
