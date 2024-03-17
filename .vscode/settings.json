@@ -5,7 +5,10 @@
     "*.inc": "c",
     "syscall.h": "c",
     "stdio.h": "c",
-    "debug.h": "c"
+    "debug.h": "c",
+    "flags.h": "c",
+    "*.tcc": "c",
+    "filesys.h": "c"
   },
   "C_Cpp_Runner.msvcBatchPath": "",
   "C_Cpp_Runner.cCompilerPath": "gcc",
