@@ -16,7 +16,9 @@
         "debug.h": "c",
         "stddef.h": "c",
         "main.h": "c",
-        "off_t.h": "c"
+        "off_t.h": "c",
+        "syscall-nr.h": "c",
+        "filesys.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

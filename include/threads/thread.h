@@ -188,5 +188,5 @@ void try_thread_yield();
 #endif /* threads/thread.h */
 
 #ifdef USERPROG
-int allocate_fd(struct file *file, struct list *fd_list);
+int allocate_fd(struct file *file, struct list *fd_table);
 #endif

@@ -7,8 +7,10 @@
 #include "threads/loader.h"
 #include "userprog/gdt.h"
 #include "threads/flags.h"
+#include "threads/init.h"
 #include "intrinsic.h"
 #include "filesys/file.h"
+#include "include/filesys/filesys.h"
 #include "lib/user/syscall.h"
 #include "lib/string.h"
 
@@ -53,9 +55,9 @@ int read (int fd, void *buffer, unsigned size);
 int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
-pid_t fork (const char *thread_name);
 int exec (const char *file);
 int wait (pid_t pid);
+pid_t fork (const char *thread_name);
 
 void
 syscall_init (void) {
@@ -104,15 +106,15 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_FORK:
-		fork(f->R.rdi);
+		// fork(f->R.rdi);
 		break;
 
 	case SYS_EXEC:
-		f->R.rax = exec(f->R.rdi);
+		// f->R.rax = exec(f->R.rdi);
 		break;
 
 	case SYS_WAIT:
-		f->R.rax = wait(f->R.rdi);
+		// f->R.rax = wait(f->R.rdi);
 		break;
 
 	case SYS_CREATE:
@@ -128,7 +130,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_FILESIZE:
-		// filesize(f->R.rdi);
+		// f->R.rax = filesize(f->R.rdi);
 		break;
 
 	case SYS_READ:
@@ -148,7 +150,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CLOSE:
-		// close(f->R.rdi);
+		close(f->R.rdi);
 		break;
 	default:
 		break;
@@ -159,7 +161,6 @@ syscall_handler (struct intr_frame *f) {
 void halt(void){
 	power_off();
 }
-
 void exit(int status){
 	char* p_name = thread_current ()->name;
 	char* p = "\0";
@@ -167,73 +168,66 @@ void exit(int status){
 	printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
 }
-
-bool create (const char *file, unsigned initial_size)
-{
-	
-	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file) || *file == '\0' )
+bool create (const char *file, unsigned initial_size) {
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
 		exit(-1);
-	
-	bool success = filesys_create(file,initial_size);
-	return success;
+
+	return filesys_create(file, initial_size);
 }
 
-int open (const char *file)
-{
-	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file))
+int open (const char *file) {
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
-	struct file* f = filesys_open(file);
+	struct file *opened_file = filesys_open(file);
 	int fd = -1;
-	if(f != NULL)
-		fd = allocate_fd(f, &thread_current()->fd_table);
+	if (opened_file != NULL) 
+	 	fd = allocate_fd(opened_file, &thread_current()->fd_table);
+	
 	return fd;
 }
 
-// void close (int fd)
-// {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			fd_table[fd] = false;
-// 			list_remove(e);
-// 			file_close(f);
-// 			break;
-// 		}
-// 	}
-// }
-
+void close (int fd) {
+	struct list *fd_list = &thread_current()->fd_table;
+	ASSERT(fd_list != NULL);
+	ASSERT(fd > 1);
+	if (list_empty(fd_list)) return;
+	
+	struct file_descriptor *file_descriptor;
+	struct list_elem *curr_fd_elem = list_begin(fd_list);
+	ASSERT(curr_fd_elem != NULL);
+	while (curr_fd_elem != list_tail(fd_list)) {
+		file_descriptor = list_entry(curr_fd_elem, struct file_descriptor, fd_elem);
+		if (file_descriptor->fd == fd) {
+			file_close(file_descriptor->file);
+			list_remove(curr_fd_elem);
+			free(file_descriptor);
+			break;
+		}
+		curr_fd_elem = list_next(curr_fd_elem);
+	}	
+}
 bool remove (const char *file)
 {
 	struct dir *dir = dir_open_root ();
 	bool success = dir != NULL && dir_remove (dir, file);
 	dir_close (dir);
-
 	return success;
 }
-
-// int filesize (int fd)
-// {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	int ret = 0;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			return file_length(f);
-// 		}
-// 	}
-// }
-
+int filesize (int fd)
+{
+	// int ret = -1;
+	// struct file* f = find_fd_to_file(fd);
+	// if(f == NULL || pml4_get_page(thread_current()->pml4, f) == NULL || !is_user_vaddr(f))
+	// 	exit(-1);
+	// ret = file_length(f);
+	// return ret;
+}
 int read (int fd, void *buffer, unsigned size)
 {
 	int byte = 0;
 	char* _buffer = buffer;
+	struct list_elem* e;
+	struct file_descriptor* f;
 	if(fd == 0)
 	{
 		while(byte < size)
@@ -246,21 +240,10 @@ int read (int fd, void *buffer, unsigned size)
 	{
 		return -1;
 	}
-	else{
-
+	else
+	{
 	}
 }
-	// struct list_elem *e;
-	// struct file* f;
-	// for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	// {
-	// 	f = list_entry(e,struct file, elem);
-	// 	if(f->fd == fd)
-	// 	{
-	// 		return file_read(f,buffer,size);
-	// 	}
-	// }
-
 int write (int fd, const void *buffer, unsigned size)
 {
 	char* _buffer = buffer;
@@ -281,43 +264,23 @@ int write (int fd, const void *buffer, unsigned size)
 
 // void seek (int fd, unsigned position)
 // {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			file_seek(f,position);
-// 			break;
-// 		}
-// 	}
+
 // }
 
 // unsigned tell (int fd)
 // {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			return file_tell(f);
-// 		}
-// 	}
+
 // }
 
-pid_t fork (const char *thread_name)
-{
+// pid_t fork (const char *thread_name)
+// {
 
-}
-int exec (const char *file)
-{
+// }
+// int exec (const char *file)
+// {
 
-}
-int wait (pid_t pid)
-{
+// }
+// int wait (pid_t pid)
+// {
 
-}
-// pid_t fork()
+// }
