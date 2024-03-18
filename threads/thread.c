@@ -147,9 +147,7 @@ thread_init (void) {
 	list_init (&destruction_req);
 	list_init (&sleep_list);
 	list_init (&all_list);
-	list_init (&file_list);
-	for(int i = 0; i<64 ; ++i)
-		fd_table[i] = false;
+
 	load_avg = 0;
 	
 	/* Set up a thread structure for the running thread. */
@@ -613,12 +611,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 	t->has_lock = 0;
 	t->wait_on_lock = NULL;
+	
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
 	
-// #ifdef USERPROG
-// 	t->pml4 = pml4_create();
-// #endif
+#ifdef USERPROG
+	list_init(&t->fd_table);
+	t->last_created_fd = 2;
+#endif
 
 	if (thread_mlfqs == true){
 		// if (t == initial_thread){
@@ -877,3 +877,14 @@ static bool advanced_scheduling(const struct list_elem *a_, const struct list_el
 
 	return a->priority > b->priority;
 }
+
+#ifdef USERPROG
+int allocate_fd(struct file *file, struct list *fd_table)
+{
+	struct file_descriptor file_descriptor;
+	file_descriptor.fd = (thread_current()->last_created_fd)++;
+	file_descriptor.file = file;
+	list_push_back(fd_table,&file_descriptor.fd_elem);
+	return file_descriptor.fd;
+}
+#endif

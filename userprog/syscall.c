@@ -108,11 +108,11 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_EXEC:
-		exec(f->R.rdi);
+		f->R.rax = exec(f->R.rdi);
 		break;
 
 	case SYS_WAIT:
-		wait(f->R.rdi);
+		f->R.rax = wait(f->R.rdi);
 		break;
 
 	case SYS_CREATE:
@@ -120,7 +120,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_REMOVE:
-		remove(f->R.rdi);
+		f->R.rax = remove(f->R.rdi);
 		break;
 
 	case SYS_OPEN:
@@ -132,11 +132,11 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_READ:
-		read(f->R.rdi,f->R.rsi,f->R.rdx);
+		f->R.rax = read(f->R.rdi,f->R.rsi,f->R.rdx);
 		break;
 
 	case SYS_WRITE:
-		write(f->R.rdi,f->R.rsi,f->R.rdx);
+		f->R.rax = write(f->R.rdi,f->R.rsi,f->R.rdx);
 		break;
 
 	case SYS_SEEK:
@@ -180,25 +180,13 @@ bool create (const char *file, unsigned initial_size)
 
 int open (const char *file)
 {
-	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file) || *file == '\0')
+	if(file == NULL || pml4_get_page(thread_current()->pml4, file) == NULL || !is_user_vaddr(file))
 		exit(-1);
 	struct file* f = filesys_open(file);
-	// if(f != NULL)
-	// {
-	// 	int i = 3;
-	// 	while(true)
-	// 	{
-	// 		if(fd_table[i] == false)
-	// 		{
-	// 			f->fd = i;
-	// 			fd_table[i] = true;
-	// 			return i;
-	// 		}
-	// 		++i;
-	// 	}
-	// }
-	// else
-	// 	exit(-1);
+	int fd = -1;
+	if(f != NULL)
+		fd = allocate_fd(f, &thread_current()->fd_table);
+	return fd;
 }
 
 // void close (int fd)
