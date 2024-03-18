@@ -147,7 +147,7 @@ thread_init (void) {
 	list_init (&destruction_req);
 	list_init (&sleep_list);
 	list_init (&all_list);
-	list_init (&file_list);
+
 	load_avg = 0;
 	
 	/* Set up a thread structure for the running thread. */
@@ -252,7 +252,6 @@ tid_t
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	// t->tf.rsp = USER_STACK;
-	t->exit_status = 0;
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -612,12 +611,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 	t->has_lock = 0;
 	t->wait_on_lock = NULL;
+	
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
 	
-// #ifdef USERPROG
-// 	t->pml4 = pml4_create();
-// #endif
+#ifdef USERPROG
+	list_init(&t->fd_table);
+	t->last_created_fd = 2;
+#endif
 
 	if (thread_mlfqs == true){
 		// if (t == initial_thread){
@@ -876,3 +877,41 @@ static bool advanced_scheduling(const struct list_elem *a_, const struct list_el
 
 	return a->priority > b->priority;
 }
+
+#ifdef USERPROG
+int allocate_fd(struct file *file, struct list *fd_table)
+{
+	struct file_descriptor* file_descriptor;
+	file_descriptor = malloc(sizeof(struct file_descriptor));
+	if(file_descriptor == NULL)
+		return -1;
+	file_descriptor->fd = (thread_current()->last_created_fd)++;
+	file_descriptor->file = file;
+	list_push_back(fd_table,&file_descriptor->fd_elem);
+	return file_descriptor->fd;
+}
+
+// int allocate_fd(struct file *file, struct list *fd_table)
+// {
+// 	struct file_descriptor file_descriptor ;
+// 	file_descriptor.fd = (thread_current()->last_created_fd)++;
+// 	file_descriptor.file = file;
+// 	list_push_back(fd_table,&file_descriptor.fd_elem);
+// 	return file_descriptor.fd;
+// }
+// struct file* find_fd_to_file(int fd)
+// {
+// 	struct file_descriptor* file_descripotr;
+// 	struct list_elem* e;
+// 	e = list_begin(&thread_current()->fd_table);
+// 	for (e = list_begin (&thread_current()->fd_table); e != list_end (&thread_current()->fd_table); e = list_next (e))
+// 	{
+// 		file_descripotr = list_entry(e, struct file_descriptor, fd_elem);
+// 		if(file_descripotr->fd == fd)
+// 			return file_descripotr->file;
+// 	}
+	
+// 	return NULL;
+// }
+
+#endif

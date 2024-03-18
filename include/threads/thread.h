@@ -29,6 +29,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+// 추가 부분
 #define FDT_PAGES 3		// pages to allocate for file descriptor tables (thread_create, process_exit)
 #define FDCOUNT_LIMIT FDT_PAGES *(1<<9) 
 
@@ -108,13 +109,13 @@ struct thread {
 	int nice_value;
 	int recent_cpu;
 	struct list_elem all_elem;
-
-	struct file **fd_table;
-	int fd_idx;
-
+	
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	struct list fd_table;
+	unsigned last_created_fd;
+
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -124,8 +125,15 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
-	int exit_status;
 };
+
+struct file_descriptor
+{
+	unsigned fd;
+	struct file* file;
+	struct list_elem fd_elem;
+};
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -162,7 +170,6 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 //구현목록
-
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 
@@ -172,8 +179,7 @@ void apply_to_all();
 int calculating_recent_cpu(struct thread* t);
 struct list all_list;
 struct list ready_list;
-struct list file_list;
-bool fd_table[64];
+
 void calc_all_recent_cpu();
 bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
@@ -182,4 +188,9 @@ void update_priority();
 void calculate_all_priority();
 void try_thread_yield();
 
+
 #endif /* threads/thread.h */
+
+#ifdef USERPROG
+int allocate_fd(struct file *file, struct list *fd_table);
+#endif

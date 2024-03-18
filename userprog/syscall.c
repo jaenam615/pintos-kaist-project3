@@ -7,18 +7,17 @@
 #include "threads/loader.h"
 #include "userprog/gdt.h"
 #include "threads/flags.h"
+#include "threads/init.h"
 #include "intrinsic.h"
 #include "filesys/file.h"
-#include "lib/user/syscall.h"
-#include "filesys/filesys.h"
-#include "threads/synch.h"
-#include "userprog/process.h"
-#include "threads/vaddr.h"
-#include "threads/palloc.h"
 #include "include/filesys/filesys.h"
+#include "lib/user/syscall.h"
+#include "lib/string.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+
+
 
 /* System call.
  *
@@ -56,12 +55,9 @@ int read (int fd, void *buffer, unsigned size);
 int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
-pid_t fork (const char *thread_name);
 int exec (const char *file);
 int wait (pid_t pid);
-
-void check_address(const uint64_t *uaddr);
-static struct file *find_file_by_fd(int fd);
+pid_t fork (const char *thread_name);
 
 void
 syscall_init (void) {
@@ -76,9 +72,6 @@ syscall_init (void) {
 	 * syscall_entry가 userland 스택을 커널 모드 스택으로 스왑할 때까지. 따라서 FLAG_FL을 마스킹했습니다.*/
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-
-	// lock_init(&thread_current()->wait_on_lock);
-	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -86,109 +79,88 @@ void
 syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 
-	char *fn_copy;
+	if(!is_user_vaddr(f->rsp)){
+		printf("isnotvaddr\n");
+		thread_exit();
+	}
 
-	// if(!is_user_vaddr(f->rsp)){
-	// 	printf("isnotvaddr\n");
-	// 	thread_exit();
-	// }
-
-	// else if(f->rsp > KERN_BASE || f->rsp < 0){
-	// 	printf("smaller\n");
-	// 	thread_exit();
-	// }
+	else if(f->rsp > KERN_BASE || f->rsp < 0){
+		printf("smaller\n");
+		thread_exit();
+	}
 	
-	// int addr = (f->rsp + 8);
-	// if (!is_user_vaddr(addr) || (addr > KERN_BASE || addr<0)) {
-	// 	printf ("third condition\n");
-	// 	thread_exit();
-	// }
+	int addr = (f->rsp + 8);
+	if (!is_user_vaddr(addr) || (addr > KERN_BASE || addr<0)) {
+		printf ("third condition\n");
+		thread_exit();
+	}
 	
 	// printf ("system call!\n");
-	switch(f->R.rax) {
-		case SYS_HALT:
-			halt();
-			break;		
+	switch(f->R.rax){
+	case SYS_HALT:
+		halt();
+		break;		
 
-		case SYS_EXIT:
-			exit(f->R.rdi);
-			break;
-		
-		// case SYS_FORK:
-		// 	f->R.rax = fork(f->R.rdi);
-		// 	break;
+	case SYS_EXIT:
+		exit(f->R.rdi);
+		break;
+	
+	case SYS_FORK:
+		// fork(f->R.rdi);
+		break;
 
-		// case SYS_EXEC:
-		// 	if(exec(f->R.rdi) == -1)
-		// 		exit(-1);
-		// 	break;
+	case SYS_EXEC:
+		// f->R.rax = exec(f->R.rdi);
+		break;
 
-		// case SYS_WAIT:
-		// 	f->R.rax = process_wait(f->R.rdi);
-		// 	break;
+	case SYS_WAIT:
+		// f->R.rax = wait(f->R.rdi);
+		break;
 
-		case SYS_CREATE:
-			f->R.rax = create(f->R.rdi,f->R.rsi);
-			break;
-		
-		case SYS_REMOVE:
-			remove(f->R.rdi);
-			break;
+	case SYS_CREATE:
+		f->R.rax = create(f->R.rdi,f->R.rsi);
+		break;
+	
+	case SYS_REMOVE:
+		f->R.rax = remove(f->R.rdi);
+		break;
 
-		// case SYS_OPEN:
-		// 	open(f->R.rdi);
-		// 	break;
+	case SYS_OPEN:
+		f->R.rax = open(f->R.rdi);
+		break;
 
-		// case SYS_FILESIZE:
-		// 	// filesize(f->R.rdi);
-		// 	break;
+	case SYS_FILESIZE:
+		// f->R.rax = filesize(f->R.rdi);
+		break;
 
-		case SYS_READ:
-			f->R.rax = read(f->R.rdi,f->R.rsi,f->R.rdx);
-			break;
+	case SYS_READ:
+		f->R.rax = read(f->R.rdi,f->R.rsi,f->R.rdx);
+		break;
 
-		case SYS_WRITE:
-			f->R.rax = write(f->R.rdi,f->R.rsi,f->R.rdx);
-			break;
+	case SYS_WRITE:
+		f->R.rax = write(f->R.rdi,f->R.rsi,f->R.rdx);
+		break;
 
-		case SYS_SEEK:
-			// seek(f->R.rdi,f->R.rsi);
-			break;
+	case SYS_SEEK:
+		// seek(f->R.rdi,f->R.rsi);
+		break;
 
-		case SYS_TELL:
-			// tell(f->R.rdi);
-			break;
+	case SYS_TELL:
+		// tell(f->R.rdi);
+		break;
 
-		case SYS_CLOSE:
-			// close(f->R.rdi);
-			break;
-		default:
-			break;
+	case SYS_CLOSE:
+		close(f->R.rdi);
+		break;
+	default:
+		break;
 	}
 
-}
-
-void check_address(const uint64_t *uaddr) {
-	struct thread *cur = thread_current();
-	if (uaddr == NULL || is_kernel_vaddr(uaddr) || pml4_get_page(cur->pml4, uaddr) == NULL) {
-		exit(-1);
-	}
-}
-
-static struct file *find_file_by_fd(int fd)
-{
-    struct thread *cur = thread_current();
-    if (fd < 0 || fd >= FDCOUNT_LIMIT)
-    {
-        return NULL;
-    }
-    return cur->fd_table[fd];
 }
 
 void halt(void){
 	power_off();
 }
-
 void exit(int status){
 	char* p_name = thread_current ()->name;
 	char* p = "\0";
@@ -196,87 +168,66 @@ void exit(int status){
 	printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
 }
-
-// pid_t fork(const char *therad_name) {
-// 	return process_fork;  
-// }
-
 bool create (const char *file, unsigned initial_size) {
-	check_address(file);
-	return filesys_create(file,initial_size);
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
+		exit(-1);
+
+	return filesys_create(file, initial_size);
 }
 
-// int open (const char *file)
-// {
-// 	struct file* f = filesys_open(file);
+int open (const char *file) {
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
+		exit(-1);
+	struct file *opened_file = filesys_open(file);
+	int fd = -1;
+	if (opened_file != NULL) 
+	 	fd = allocate_fd(opened_file, &thread_current()->fd_table);
+	
+	return fd;
+}
 
-// 	if(f != NULL)
-// 	{
-// 		int i = 3;
-// 		while(true)
-// 		{
-// 			if(fd_table[i] == false)
-// 			{
-// 				f->fd = i;
-// 				fd_table[i] = true;
-// 				list_push_back(&file_list,&f->elem);
-// 				break;
-// 			}
-// 			++i;
-// 		}
-// 		return f->fd;
-// 	}
-// 	else
-// 	{
-// 		return -1;
-// 	}
-// }
-
-void close (int fd)
-{
-	struct list_elem *e;
-	struct file* f;
-	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	{
-		f = list_entry(e,struct file, elem);
-		if(f->fd == fd)
-		{
-			fd_table[fd] = false;
-			list_remove(e);
-			file_close(f);
+void close (int fd) {
+	struct list *fd_list = &thread_current()->fd_table;
+	ASSERT(fd_list != NULL);
+	ASSERT(fd > 1);
+	if (list_empty(fd_list)) return;
+	
+	struct file_descriptor *file_descriptor;
+	struct list_elem *curr_fd_elem = list_begin(fd_list);
+	ASSERT(curr_fd_elem != NULL);
+	while (curr_fd_elem != list_tail(fd_list)) {
+		file_descriptor = list_entry(curr_fd_elem, struct file_descriptor, fd_elem);
+		if (file_descriptor->fd == fd) {
+			file_close(file_descriptor->file);
+			list_remove(curr_fd_elem);
+			free(file_descriptor);
 			break;
 		}
-	}
+		curr_fd_elem = list_next(curr_fd_elem);
+	}	
 }
-
 bool remove (const char *file)
 {
 	struct dir *dir = dir_open_root ();
 	bool success = dir != NULL && dir_remove (dir, file);
 	dir_close (dir);
-
 	return success;
 }
-
-// int filesize (int fd)
-// {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	int ret = 0;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			return file_length(f);
-// 		}
-// 	}
-// }
-
+int filesize (int fd)
+{
+	// int ret = -1;
+	// struct file* f = find_fd_to_file(fd);
+	// if(f == NULL || pml4_get_page(thread_current()->pml4, f) == NULL || !is_user_vaddr(f))
+	// 	exit(-1);
+	// ret = file_length(f);
+	// return ret;
+}
 int read (int fd, void *buffer, unsigned size)
 {
 	int byte = 0;
 	char* _buffer = buffer;
+	struct list_elem* e;
+	struct file_descriptor* f;
 	if(fd == 0)
 	{
 		while(byte < size)
@@ -289,47 +240,10 @@ int read (int fd, void *buffer, unsigned size)
 	{
 		return -1;
 	}
-	else{
-
+	else
+	{
 	}
 }
-// int read(int fd, void *buffer, unsigned size) {
-// 	check_address(buffer);
-
-// 	int read_result;
-// 	struct thread *cur = thread_current();
-// 	struct file *file_fd = find_file_by_fd(fd);
-
-// 	if (fd == 0) {
-// 		// read_result = i;
-// 		*(char *)buffer = input_getc();
-// 		read_result = size;
-// 	}
-// 	else {
-// 		if (find_file_by_fd(fd) == NULL) {
-// 			return -1;
-// 		}
-// 		else {
-// 			lock_acquire(&filesys_lock);
-// 			read_result = file_read(find_file_by_fd(fd), buffer, size);
-// 			lock_release(&filesys_lock);
-// 		}
-// 	}
-// 	return read_result;
-// }
-
-
-	// struct list_elem *e;
-	// struct file* f;
-	// for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-	// {
-	// 	f = list_entry(e,struct file, elem);
-	// 	if(f->fd == fd)
-	// 	{
-	// 		return file_read(f,buffer,size);
-	// 	}
-	// }
-
 int write (int fd, const void *buffer, unsigned size)
 {
 	char* _buffer = buffer;
@@ -350,43 +264,23 @@ int write (int fd, const void *buffer, unsigned size)
 
 // void seek (int fd, unsigned position)
 // {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			file_seek(f,position);
-// 			break;
-// 		}
-// 	}
+
 // }
 
 // unsigned tell (int fd)
 // {
-// 	struct list_elem *e;
-// 	struct file* f;
-// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
-// 	{
-// 		f = list_entry(e,struct file, elem);
-// 		if(f->fd == fd)
-// 		{
-// 			return file_tell(f);
-// 		}
-// 	}
+
 // }
 
-int exec (const char *file)
-{
-	char *file_name = file;
+// pid_t fork (const char *thread_name)
+// {
 
-	if(process_exec(file_name) == -1)
-		return -1;
-}
+// }
+// int exec (const char *file)
+// {
 
-int wait (pid_t pid)
-{
+// }
+// int wait (pid_t pid)
+// {
 
-}
-// pid_t fork()
+// }
