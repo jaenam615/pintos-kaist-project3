@@ -252,11 +252,12 @@ tid_t
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	// t->tf.rsp = USER_STACK;
+	t->exit_status = 0;
 
 	/* Add to run queue. */
 	thread_unblock (t);
 	if (thread_get_priority() < priority)
-		try_thread_yield();		
+		thread_yield();		
 
 	return tid;
 }
@@ -394,8 +395,11 @@ thread_set_priority (int new_priority) {
 }
 
 void try_thread_yield(void){
-	if(!list_empty(&ready_list) && thread_current == idle_thread)
-		thread_yield;
+	if(!list_empty(&ready_list) && thread_current() != idle_thread )
+	{
+		if(thread_get_priority()<list_entry(list_begin(&ready_list),struct thread, elem)->priority)
+			thread_yield();
+	}	
 }
 
 /* Returns the current thread's priority. */

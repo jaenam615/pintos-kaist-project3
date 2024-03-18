@@ -15,6 +15,7 @@
 #include "userprog/process.h"
 #include "threads/vaddr.h"
 #include "threads/palloc.h"
+#include "include/filesys/filesys.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -55,7 +56,7 @@ int read (int fd, void *buffer, unsigned size);
 int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
-// pid_t fork (const char *thread_name, struct intr_frame *f);
+pid_t fork (const char *thread_name);
 int exec (const char *file);
 int wait (pid_t pid);
 
@@ -76,7 +77,8 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
-	lock_init(&thread_current()->wait_on_lock);
+	// lock_init(&thread_current()->wait_on_lock);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -113,7 +115,7 @@ syscall_handler (struct intr_frame *f) {
 			break;
 		
 		// case SYS_FORK:
-		// 	f->R.rax = fork(f->R.rdi, f);
+		// 	f->R.rax = fork(f->R.rdi);
 		// 	break;
 
 		// case SYS_EXEC:
@@ -129,39 +131,39 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = create(f->R.rdi,f->R.rsi);
 			break;
 		
-		// case SYS_REMOVE:
-		// 	remove(f->R.rdi);
-		// 	break;
+		case SYS_REMOVE:
+			remove(f->R.rdi);
+			break;
 
 		// case SYS_OPEN:
 		// 	open(f->R.rdi);
 		// 	break;
 
 		// case SYS_FILESIZE:
-		// 	filesize(f->R.rdi);
+		// 	// filesize(f->R.rdi);
 		// 	break;
 
-		// case SYS_READ:
-		// 	read(f->R.rdi,f->R.rsi,f->R.rdx);
-		// 	break;
+		case SYS_READ:
+			f->R.rax = read(f->R.rdi,f->R.rsi,f->R.rdx);
+			break;
 
 		case SYS_WRITE:
 			f->R.rax = write(f->R.rdi,f->R.rsi,f->R.rdx);
 			break;
 
-		// case SYS_SEEK:
-		// 	seek(f->R.rdi,f->R.rsi);
-		// 	break;
+		case SYS_SEEK:
+			// seek(f->R.rdi,f->R.rsi);
+			break;
 
-		// case SYS_TELL:
-		// 	tell(f->R.rdi);
-		// 	break;
+		case SYS_TELL:
+			// tell(f->R.rdi);
+			break;
 
-		// case SYS_CLOSE:
-		// 	close(f->R.rdi);
-		// 	break;
-		// default:
-		// 	break;
+		case SYS_CLOSE:
+			// close(f->R.rdi);
+			break;
+		default:
+			break;
 	}
 
 }
@@ -173,19 +175,30 @@ void check_address(const uint64_t *uaddr) {
 	}
 }
 
+static struct file *find_file_by_fd(int fd)
+{
+    struct thread *cur = thread_current();
+    if (fd < 0 || fd >= FDCOUNT_LIMIT)
+    {
+        return NULL;
+    }
+    return cur->fd_table[fd];
+}
+
 void halt(void){
 	power_off();
 }
 
 void exit(int status){
-	struct thread *t = thread_current ();
-	t->status = status;
-	printf ("%s: exit(%d)\n", thread_name(), status);
+	char* p_name = thread_current ()->name;
+	char* p = "\0";
+	strtok_r(p_name," ",&p);
+	printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
 }
 
-// tid_t fork(const char *therad_name, struct intr_frame *f) {
-// 	return process_fork
+// pid_t fork(const char *therad_name) {
+// 	return process_fork;  
 // }
 
 bool create (const char *file, unsigned initial_size) {
@@ -193,36 +206,187 @@ bool create (const char *file, unsigned initial_size) {
 	return filesys_create(file,initial_size);
 }
 
-int write (int fd, const void *buffer, unsigned size) {
-	check_address(buffer);
-	int write_result;
-	lock_acquire(&thread_current()->wait_on_lock);
-	if (fd == 1){
-		putbuf(buffer, size);
-		write_result = size;
+// int open (const char *file)
+// {
+// 	struct file* f = filesys_open(file);
+
+// 	if(f != NULL)
+// 	{
+// 		int i = 3;
+// 		while(true)
+// 		{
+// 			if(fd_table[i] == false)
+// 			{
+// 				f->fd = i;
+// 				fd_table[i] = true;
+// 				list_push_back(&file_list,&f->elem);
+// 				break;
+// 			}
+// 			++i;
+// 		}
+// 		return f->fd;
+// 	}
+// 	else
+// 	{
+// 		return -1;
+// 	}
+// }
+
+void close (int fd)
+{
+	struct list_elem *e;
+	struct file* f;
+	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+	{
+		f = list_entry(e,struct file, elem);
+		if(f->fd == fd)
+		{
+			fd_table[fd] = false;
+			list_remove(e);
+			file_close(f);
+			break;
+		}
 	}
-	else if(fd<2){
-		write_result = -1;
+}
+
+bool remove (const char *file)
+{
+	struct dir *dir = dir_open_root ();
+	bool success = dir != NULL && dir_remove (dir, file);
+	dir_close (dir);
+
+	return success;
+}
+
+// int filesize (int fd)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	int ret = 0;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			return file_length(f);
+// 		}
+// 	}
+// }
+
+int read (int fd, void *buffer, unsigned size)
+{
+	int byte = 0;
+	char* _buffer = buffer;
+	if(fd == 0)
+	{
+		while(byte < size)
+		{
+			_buffer[byte++] = input_getc();
+		}
+		return byte;
+	}
+	else if(fd == 1)
+	{
+		return -1;
+	}
+	else{
+
+	}
+}
+// int read(int fd, void *buffer, unsigned size) {
+// 	check_address(buffer);
+
+// 	int read_result;
+// 	struct thread *cur = thread_current();
+// 	struct file *file_fd = find_file_by_fd(fd);
+
+// 	if (fd == 0) {
+// 		// read_result = i;
+// 		*(char *)buffer = input_getc();
+// 		read_result = size;
+// 	}
+// 	else {
+// 		if (find_file_by_fd(fd) == NULL) {
+// 			return -1;
+// 		}
+// 		else {
+// 			lock_acquire(&filesys_lock);
+// 			read_result = file_read(find_file_by_fd(fd), buffer, size);
+// 			lock_release(&filesys_lock);
+// 		}
+// 	}
+// 	return read_result;
+// }
+
+
+	// struct list_elem *e;
+	// struct file* f;
+	// for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+	// {
+	// 	f = list_entry(e,struct file, elem);
+	// 	if(f->fd == fd)
+	// 	{
+	// 		return file_read(f,buffer,size);
+	// 	}
+	// }
+
+int write (int fd, const void *buffer, unsigned size)
+{
+	char* _buffer = buffer;
+	if(fd == 0)
+	{
+		return -1;
+	}
+	else if(fd == 1)
+	{
+		putbuf(_buffer,size);
+		return size;
 	}
 	else
-	{	
-		struct file *file = find_file_by_fd(fd);
-		if(file == NULL){
-			write_result = -1;
-		}
-		else{
-			write_result = file_write(file, buffer, size);
-		}
+	{
+
 	}
-	lock_release(&thread_current()->wait_on_lock);
-	return write_result;
 }
 
-static struct file *find_file_by_fd(int fd) {
-	struct thread *cur = thread_current();
+// void seek (int fd, unsigned position)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			file_seek(f,position);
+// 			break;
+// 		}
+// 	}
+// }
 
-	if (fd < 0 || fd >= FDCOUNT_LIMIT) {
-		return NULL;
-	}
-	return cur->fd_table[fd];
+// unsigned tell (int fd)
+// {
+// 	struct list_elem *e;
+// 	struct file* f;
+// 	for(e = list_begin(&file_list); e!= list_end(&file_list);e = list_next(e))
+// 	{
+// 		f = list_entry(e,struct file, elem);
+// 		if(f->fd == fd)
+// 		{
+// 			return file_tell(f);
+// 		}
+// 	}
+// }
+
+int exec (const char *file)
+{
+	char *file_name = file;
+
+	if(process_exec(file_name) == -1)
+		return -1;
 }
+
+int wait (pid_t pid)
+{
+
+}
+// pid_t fork()
