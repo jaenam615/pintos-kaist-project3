@@ -352,13 +352,22 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *t = thread_current();
 
-	int fd = 2; 
-	for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
-		fd ++;
-		close (fd);	
+	struct list *exit_list = &t->fd_table;
+	struct list_elem *e = list_begin(&exit_list);
+	while (!list_empty(exit_list)){
+		struct file_descriptor *exit_fd = list_entry(e, struct file_descriptor, fd_elem);
+		file_close(exit_fd->file);
+		e = list_remove(&exit_fd->fd_elem);
+		free(exit_fd);
 	}
+
+	// int fd = 2; 
+	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
+	// 	fd ++;
+	// 	close (fd);	
+	// }
 	file_close(t->running);
-	// t->exit_status = THREAD_DYING;
+	t->exit_status = THREAD_DYING;
 	process_cleanup();
 	sema_up(&t->wait_sema);
 	sema_down(&t->exit_sema);
