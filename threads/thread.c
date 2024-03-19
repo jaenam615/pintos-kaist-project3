@@ -336,8 +336,9 @@ thread_tid (void) {
 void
 thread_exit (void) {
 	ASSERT (!intr_context ());
-
+	
 #ifdef USERPROG
+	// sema_up(&thread_current()->parent->process_sema);
 	process_exit ();
 #endif
 
@@ -614,10 +615,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
-	
+	//merged - check
 #ifdef USERPROG
 	list_init(&t->fd_table);
 	t->last_created_fd = 2;
+	// sema_init(&t->process_sema, 0);
 #endif
 
 	if (thread_mlfqs == true){

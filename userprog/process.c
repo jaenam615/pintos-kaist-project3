@@ -101,8 +101,9 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
+	
 	return thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
 }
@@ -156,7 +157,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -236,6 +237,7 @@ process_exec (void *f_name) {
 	_if.R.rdi = i;
 	_if.R.rsi = (char*)_if.rsp + 8;
 
+
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	// argument_stack(argv, i, &_if);
@@ -249,38 +251,6 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-// void argument_stack(char ** box, int num, void ** rsp)
-// // 이름과 인자가 담긴 배열, 인자의 개수, 스택포인터 주소값
-// {
-// 	for(int i = num - 1; i>=0; --i)
-// 	{
-// 		for(int j = strlen(box[i]); j>=0; --j)
-// 		{
-// 			--(*rsp); // 스택의 주소 감소
-// 			**(char **)rsp = box[i][j]; // 주소에 문자하나 저장
-// 		}
-// 		box[i] = *(char**)rsp; // 주소값 저장(인자의 시작점)
-// 	}
-
-// 	int padding = (int)*rsp %8; // 인자만큼 패딩
-// 	for(int i = 0; i<padding; ++i)
-// 	{
-// 		--(*rsp);
-// 		**(uint8_t **)rsp = 0;
-// 	}
-
-// 	(*rsp) -= 8;
-// 	**(char ***)rsp = 0; //인자 문자열 종료 0 
-
-// 	for(int i = num -1; i >= 0; --i)
-// 	// 각 문자열의 주소를 넣어준다
-// 	{
-// 		(*rsp) -= 8;
-// 		**(char***)rsp = box[i];
-// 	}
-// 	(*rsp) -= 8;
-// 	**(void***)rsp = 0; // fake return address 추가
-// }
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
@@ -292,13 +262,23 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for (int i =0; i<2000000000; i++){
+	// struct list_elem child = list_head(thread_current()->child_list); 
+	// while (child != NULL){
+	// 	list_entry()
+	// }
+	// list_entry();
+	// sema_down(&child_tid->process_sema);
+	// if ()
+	for (uint64_t i =0; i<4000000000; i++){
+
 	}
 
+	// if (child_tid)
+	// tid
 	return -1;
 }
 
@@ -309,11 +289,10 @@ process_exit (void) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. 
-	 * TODO: 코드가 여기에 있습니다.
-	 * TODO: 프로세스 종료 메시지 구현(참조)
-	 * TODO: project2/process_termination.html).
-	 * TODO: 여기에 프로세스 리소스 정리를 구현하는 것이 좋습니다.*/
+	 * TODO: We recommend you to implement process resource cleanup here. */
+	
+	// sema_up(&curr->parent->process_sema);
+	// try_thread_yield();
 }
 
 /* Free the current process's resources. */
