@@ -14,6 +14,7 @@
 #include "lib/string.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -181,7 +182,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_TELL:
-		tell(f->R.rdi);
+		f->R.rax = tell(f->R.rdi);
 		break;
 
 	case SYS_CLOSE:
@@ -213,7 +214,7 @@ void exit(int status)
 
 tid_t fork (const char *thread_name){
 	
-	process_fork(thread_name, thread_current()->tf);
+	return process_fork(thread_name, &thread_current()->tf);
 }
 
 //현재 프로세스를 file로 바꿈
@@ -237,7 +238,7 @@ int exec (const char *file){
 int wait (tid_t t)
 {		
 
-	process_wait(t); 
+	return process_wait(t); 
 }
 
 //file이라는 파일을 만들고, 성공시 true 반환
@@ -355,7 +356,7 @@ unsigned tell (int fd)
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
 	if(file_desc == NULL)
 		return -1;
-	file_tell(file_desc->file);
+	return file_tell(&file_desc->file);
 }
 
 void close (int fd) {
