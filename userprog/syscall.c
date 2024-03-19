@@ -1,18 +1,15 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
-#include <list.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
+#include "threads/init.h"
 #include "userprog/gdt.h"
 #include "threads/flags.h"
-#include "threads/init.h"
 #include "intrinsic.h"
+#include "filesys/filesys.h"
 #include "filesys/file.h"
-#include "include/filesys/filesys.h"
-#include "lib/user/syscall.h"
-#include "lib/string.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -56,8 +53,8 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 int exec (const char *file);
-int wait (pid_t pid);
-pid_t fork (const char *thread_name);
+// int wait (pid_t pid);
+// pid_t fork (const char *thread_name);
 
 void
 syscall_init (void) {
@@ -130,7 +127,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_FILESIZE:
-		// f->R.rax = filesize(f->R.rdi);
+		f->R.rax = filesize(f->R.rdi);
 		break;
 
 	case SYS_READ:
@@ -142,11 +139,11 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_SEEK:
-		// seek(f->R.rdi,f->R.rsi);
+		seek(f->R.rdi,f->R.rsi);
 		break;
 
 	case SYS_TELL:
-		// tell(f->R.rdi);
+		tell(f->R.rdi);
 		break;
 
 	case SYS_CLOSE:
@@ -156,6 +153,25 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	}
 
+}
+
+struct file_descriptor *find_file_descriptor(int fd) {
+	struct list *fd_table = &thread_current()->fd_table;
+	ASSERT(fd_table != NULL);
+	ASSERT(fd > 1);
+	if (list_empty(fd_table)) 
+		return NULL;
+	struct file_descriptor *file_descriptor;
+	struct list_elem *e = list_begin(fd_table);
+	ASSERT(e != NULL);
+	while (e != list_tail(fd_table)) {
+		file_descriptor = list_entry(e, struct file_descriptor, fd_elem);
+		if (file_descriptor->fd == fd) {
+			return file_descriptor;
+		}
+		e = list_next(e);
+	}
+	return NULL;
 }
 
 void halt(void){
@@ -187,24 +203,13 @@ int open (const char *file) {
 }
 
 void close (int fd) {
-	struct list *fd_list = &thread_current()->fd_table;
-	ASSERT(fd_list != NULL);
-	ASSERT(fd > 1);
-	if (list_empty(fd_list)) return;
-	
-	struct file_descriptor *file_descriptor;
-	struct list_elem *curr_fd_elem = list_begin(fd_list);
-	ASSERT(curr_fd_elem != NULL);
-	while (curr_fd_elem != list_tail(fd_list)) {
-		file_descriptor = list_entry(curr_fd_elem, struct file_descriptor, fd_elem);
-		if (file_descriptor->fd == fd) {
-			file_close(file_descriptor->file);
-			list_remove(curr_fd_elem);
-			free(file_descriptor);
-			break;
-		}
-		curr_fd_elem = list_next(curr_fd_elem);
-	}	
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
+		return;
+	file_close(file_desc->file);
+	list_remove(&file_desc->fd_elem);
+	free(file_desc);
+
 }
 bool remove (const char *file)
 {
@@ -215,26 +220,23 @@ bool remove (const char *file)
 }
 int filesize (int fd)
 {
-	// int ret = -1;
-	// struct file* f = find_fd_to_file(fd);
-	// if(f == NULL || pml4_get_page(thread_current()->pml4, f) == NULL || !is_user_vaddr(f))
-	// 	exit(-1);
-	// ret = file_length(f);
-	// return ret;
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
+		return -1;
+	return file_length(file_desc->file);
 }
 int read (int fd, void *buffer, unsigned size)
 {
+	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
+		exit(-1);
 	int byte = 0;
 	char* _buffer = buffer;
-	struct list_elem* e;
-	struct file_descriptor* f;
 	if(fd == 0)
 	{
 		while(byte < size)
 		{
 			_buffer[byte++] = input_getc();
 		}
-		return byte;
 	}
 	else if(fd == 1)
 	{
@@ -242,7 +244,12 @@ int read (int fd, void *buffer, unsigned size)
 	}
 	else
 	{
+		struct file_descriptor *file_desc = find_file_descriptor(fd);
+		if(file_desc == NULL)
+			return -1;
+		byte = file_read(file_desc->file,buffer,size);
 	}
+	return byte;
 }
 int write (int fd, const void *buffer, unsigned size)
 {
@@ -262,15 +269,21 @@ int write (int fd, const void *buffer, unsigned size)
 	}
 }
 
-// void seek (int fd, unsigned position)
-// {
+void seek (int fd, unsigned position)
+{
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
+		return -1;
+	file_seek(file_desc->file, position);
+}
 
-// }
-
-// unsigned tell (int fd)
-// {
-
-// }
+unsigned tell (int fd)
+{
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
+		return -1;
+	file_tell(file_desc->file);
+}
 
 // pid_t fork (const char *thread_name)
 // {

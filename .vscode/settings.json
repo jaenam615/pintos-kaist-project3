@@ -18,7 +18,8 @@
         "main.h": "c",
         "off_t.h": "c",
         "syscall-nr.h": "c",
-        "filesys.h": "c"
+        "filesys.h": "c",
+        "inode.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

@@ -891,27 +891,4 @@ int allocate_fd(struct file *file, struct list *fd_table)
 	return file_descriptor->fd;
 }
 
-// int allocate_fd(struct file *file, struct list *fd_table)
-// {
-// 	struct file_descriptor file_descriptor ;
-// 	file_descriptor.fd = (thread_current()->last_created_fd)++;
-// 	file_descriptor.file = file;
-// 	list_push_back(fd_table,&file_descriptor.fd_elem);
-// 	return file_descriptor.fd;
-// }
-// struct file* find_fd_to_file(int fd)
-// {
-// 	struct file_descriptor* file_descripotr;
-// 	struct list_elem* e;
-// 	e = list_begin(&thread_current()->fd_table);
-// 	for (e = list_begin (&thread_current()->fd_table); e != list_end (&thread_current()->fd_table); e = list_next (e))
-// 	{
-// 		file_descripotr = list_entry(e, struct file_descriptor, fd_elem);
-// 		if(file_descripotr->fd == fd)
-// 			return file_descripotr->file;
-// 	}
-	
-// 	return NULL;
-// }
-
 #endif
