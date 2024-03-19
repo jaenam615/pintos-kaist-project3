@@ -620,6 +620,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 #ifdef USERPROG
 	list_init(&t->fd_table);
 	list_init(&t->child_list);
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->exit_sema, 0);
 	sema_init(&t->process_sema, 0);
 	list_init(&t->process_sema.waiters);
 	t->last_created_fd = 2;

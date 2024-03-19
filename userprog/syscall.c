@@ -151,7 +151,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_WAIT:
-		wait(t);
+		f->R.rax = wait(f->R.rdi);
 		break;
 	
 	case SYS_CREATE:
