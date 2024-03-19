@@ -105,10 +105,13 @@ struct thread {
 	int nice_value;
 	int recent_cpu;
 	struct list_elem all_elem;
-
+	
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	struct list fd_table;
+	unsigned last_created_fd;
+
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -119,6 +122,14 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
+
+struct file_descriptor
+{
+	unsigned fd;
+	struct file* file;
+	struct list_elem fd_elem;
+};
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -155,7 +166,6 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 //구현목록
-
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 
@@ -165,6 +175,7 @@ void apply_to_all();
 int calculating_recent_cpu(struct thread* t);
 struct list all_list;
 struct list ready_list;
+
 void calc_all_recent_cpu();
 bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED);
@@ -173,4 +184,9 @@ void update_priority();
 void calculate_all_priority();
 void try_thread_yield();
 
+
 #endif /* threads/thread.h */
+
+#ifdef USERPROG
+int allocate_fd(struct file *file, struct list *fd_table);
+#endif
