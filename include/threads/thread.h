@@ -139,6 +139,9 @@ struct thread {
 	int fd_idx;
 
 	struct file *running;
+
+	struct semaphore wait_sema;
+	struct semaphore exit_sema;
 };
 
 struct file_descriptor

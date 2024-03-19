@@ -24,6 +24,9 @@
 #include "vm/vm.h"
 #endif
 
+#include "userprog/syscall.h"
+
+
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -314,24 +317,21 @@ process_wait (tid_t child_tid) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
-	for (uint64_t i; i < 40000000000; i++){
+	// for (uint64_t i; i < 40000000000; i++){
 
+	// }
+	// return -1;
+	struct thread *t = get_thread_from_tid(child_tid);
+	if (t == NULL) {
+		return -1;
 	}
-	return -1;
-	// struct thread *t = get_thread_from_tid(child_tid);
-	// if (t == NULL) {
-	// 	return -1;
-	// }
 
-	// sema_down(&t->process_sema);
-	// list_remove(&t->process_sema.waiters);
+	sema_down(&t->wait_sema);
+	list_remove(&t->child_list_elem);
 
-	// if (t->exit_status != 0) {
-	// 	return -1;
-	// }
-	// else {
-	// 	return t->exit_status;
-	// }
+	sema_up(&t->exit_sema);
+
+	return t->exit_status; 
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -344,11 +344,16 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *t = thread_current();
 
-
+	int fd = 2; 
+	for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
+		fd ++;
+		close (fd);	
+	}
 	file_close(t->running);
-	t->exit_status = THREAD_DYING;
+	// t->exit_status = THREAD_DYING;
 	process_cleanup();
-	// sema_up(&t->process_sema);
+	sema_up(&t->wait_sema);
+	sema_down(&t->exit_sema);
 
 }
 
