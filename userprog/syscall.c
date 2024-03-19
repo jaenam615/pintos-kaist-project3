@@ -19,7 +19,7 @@ void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void halt (void);
 void exit (int status);
-// pid_t fork (const char *thread_name);
+tid_t fork (const char *thread_name);
 int exec (const char *file);
 int wait (tid_t);
 bool create (const char *file, unsigned initial_size);
@@ -205,6 +205,7 @@ void exit(int status)
 {
 	char* p_name = thread_current ()->name;
 	char* p = "\0";
+	thread_current()->exit_status = status;
 	strtok_r(p_name," ",&p);
 	printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
@@ -222,7 +223,7 @@ int exec (const char *file){
 		exit(-1);
 
 	char* file_in_kernel;
-	file_in_kernel = palloc_get_page(PAL_ZERO);
+	file_in_kernel = palloc_get_page(0);
 
 	if (file_in_kernel == NULL)
 		exit(-1);
@@ -235,6 +236,7 @@ int exec (const char *file){
 //자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
 int wait (tid_t t)
 {		
+
 	process_wait(t); 
 }
 
@@ -369,25 +371,25 @@ void close (int fd) {
 
 /* --------------------------------- */
 
-int insert_file_fdt(struct file *file)
-{
-    struct thread *cur = thread_current();
-    struct file **fdt = cur->descriptor_table;
+// int insert_file_fdt(struct file *file)
+// {
+//     struct thread *cur = thread_current();
+//     struct file **fdt = cur->descriptor_table;
 
-    // Find open spot from the front
-    //  fd 위치가 제한 범위 넘지않고, fd table의 인덱스 위치와 일치한다면
-    while (cur->fd_idx < 10 && fdt[cur->fd_idx])
-    {
-        cur->fd_idx++;
-    }
+//     // Find open spot from the front
+//     //  fd 위치가 제한 범위 넘지않고, fd table의 인덱스 위치와 일치한다면
+//     while (cur->fd_idx < 10 && fdt[cur->fd_idx])
+//     {
+//         cur->fd_idx++;
+//     }
 
-    // error - fd table full
-    if (cur->fd_idx >= 10)
-        return -1;
+//     // error - fd table full
+//     if (cur->fd_idx >= 10)
+//         return -1;
 
-    fdt[cur->fd_idx] = file;
-    return cur->fd_idx;
-}
+//     fdt[cur->fd_idx] = file;
+//     return cur->fd_idx;
+// }
 
 // static struct file *find_file_by_fd(int fd)
 // {

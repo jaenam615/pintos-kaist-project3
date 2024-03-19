@@ -128,12 +128,17 @@ struct thread {
 	//구현
 	struct list child_list;
 	struct list_elem child_list_elem;
+
 	struct thread *parent;
 	struct semaphore process_sema;
+
 	int exit_status; 
+
 	struct intr_frame parent_tf;
-	struct file **descriptor_table;
+	// struct file **descriptor_table;
 	int fd_idx;
+
+	struct file *running;
 };
 
 struct file_descriptor

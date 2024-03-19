@@ -252,7 +252,7 @@ tid_t
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	// t->tf.rsp = USER_STACK;
-
+  	list_push_back(&thread_current()->child_list, &t->child_list_elem);
 	/* Add to run queue. */
 	thread_unblock (t);
 	if (thread_get_priority() < priority)
@@ -345,6 +345,7 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
+	list_remove(&thread_current()->all_elem);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -615,9 +616,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
+	list_init(&t->fd_table);
 	//merged - check
 #ifdef USERPROG
 	list_init(&t->fd_table);
+	list_init(&t->child_list);
+	sema_init(&t->process_sema, 0);
+	list_init(&t->process_sema.waiters);
 	t->last_created_fd = 2;
 	// sema_init(&t->process_sema, 0);
 #endif
