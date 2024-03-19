@@ -284,7 +284,22 @@ int open (const char *file)
 	return fd;
 }
 
-//열린 파일 (fd로 식별)의 크기를 반환 (바이트 단위)
+void close (int fd) {
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
+		return;
+	file_close(file_desc->file);
+	list_remove(&file_desc->fd_elem);
+	free(file_desc);
+
+}
+bool remove (const char *file)
+{
+	struct dir *dir = dir_open_root ();
+	bool success = dir != NULL && dir_remove (dir, file);
+	dir_close (dir);
+	return success;
+}
 int filesize (int fd)
 {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
