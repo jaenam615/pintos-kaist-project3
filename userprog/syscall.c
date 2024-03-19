@@ -253,6 +253,8 @@ int read (int fd, void *buffer, unsigned size)
 }
 int write (int fd, const void *buffer, unsigned size)
 {
+	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
+		exit(-1);
 	char* _buffer = buffer;
 	if(fd == 0)
 	{
@@ -265,7 +267,11 @@ int write (int fd, const void *buffer, unsigned size)
 	}
 	else
 	{
-
+		struct file_descriptor *file_desc = find_file_descriptor(fd);
+		if(file_desc == NULL)
+			return -1;
+		file_write(file_desc->file,_buffer,size);
+		return size;
 	}
 }
 
