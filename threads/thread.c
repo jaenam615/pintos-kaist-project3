@@ -890,5 +890,4 @@ int allocate_fd(struct file *file, struct list *fd_table)
 	list_push_back(fd_table,&file_descriptor->fd_elem);
 	return file_descriptor->fd;
 }
-
 #endif
