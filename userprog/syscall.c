@@ -215,7 +215,7 @@ void exit(int status)
 
 tid_t fork (const char *thread_name){
 	
-	process_fork(thread_name, &thread_current()->tf);
+	return process_fork(thread_name, &thread_current()->tf);
 }
 
 //현재 프로세스를 file로 바꿈

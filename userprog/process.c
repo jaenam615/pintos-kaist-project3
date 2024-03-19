@@ -106,11 +106,11 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_) {
+process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	// thread_current()->tf = if_;
 	struct thread *cur = thread_current();
-	memcpy(&cur->parent_tf, &if_, sizeof(struct intr_frame));
+	memcpy(&cur->parent_tf, if_, sizeof(struct intr_frame));
 
 	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, cur);
 	if (tid = TID_ERROR){
@@ -841,9 +841,11 @@ void argument_stack (char **argv, int argc, struct intr_frame *if_){
 struct thread *get_thread_from_tid(tid_t thread_id){
 
 	struct thread * t = thread_current();
-	struct list_elem* e = list_front(&t->child_list);
+	struct list* child_list = &t->child_list;
+	struct list_elem* e;
 
-	for (e = list_begin (&t->child_list); e != list_end (&t->child_list); e = list_next (e)){
+	for (e = list_begin (child_list); e != list_end (child_list); e = list_next (e))
+	{
 		t = list_entry(e, struct thread, child_list_elem);
 		if (t->tid == thread_id){
 			return t;
