@@ -10,6 +10,7 @@
 #include "intrinsic.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -53,7 +54,7 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 int exec (const char *file);
-pid_t fork (const char *thread_name);
+pid_t fork (const char *thread_name, struct intr_frame *f);
 // int wait (pid_t pid);
 
 void
@@ -103,7 +104,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_FORK:
-		// fork(f->R.rdi);
+		f->R.rax = fork(f->R.rdi, f);
 		break;
 
 	case SYS_EXEC:
@@ -291,8 +292,8 @@ unsigned tell (int fd)
 	file_tell(file_desc->file);
 }
 
-pid_t fork (const char *thread_name) {
-	
+pid_t fork (const char *thread_name, struct intr_frame *f) {
+	return process_fork(*thread_name, *f);
 }
 
 // }

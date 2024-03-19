@@ -20,7 +20,8 @@
     "syscall-nr.h": "c",
     "filesys.h": "c",
     "inode.h": "c",
-    "malloc.h": "c"
+    "malloc.h": "c",
+    "loader.h": "c"
   },
   "C_Cpp.errorSquiggles": "disabled",
   "C_Cpp_Runner.msvcBatchPath": ""
