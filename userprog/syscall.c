@@ -215,7 +215,7 @@ void exit(int status)
 
 tid_t fork (const char *thread_name){
 	
-	process_fork(thread_name, thread_current()->tf);
+	process_fork(thread_name, &thread_current()->tf);
 }
 
 //현재 프로세스를 file로 바꿈
@@ -283,7 +283,6 @@ int open (const char *file)
 
 	return fd;
 }
-
 void close (int fd) {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
 	if(file_desc == NULL)
@@ -292,13 +291,6 @@ void close (int fd) {
 	list_remove(&file_desc->fd_elem);
 	free(file_desc);
 
-}
-bool remove (const char *file)
-{
-	struct dir *dir = dir_open_root ();
-	bool success = dir != NULL && dir_remove (dir, file);
-	dir_close (dir);
-	return success;
 }
 int filesize (int fd)
 {
