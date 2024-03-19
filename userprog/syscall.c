@@ -21,15 +21,15 @@ void halt (void);
 void exit (int status);
 // pid_t fork (const char *thread_name);
 int exec (const char *file);
-int wait (pid_t);
+int wait (tid_t);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
-// int filesize (int fd);
+int filesize (int fd);
 int read (int fd, void *buffer, unsigned length);
 int write (int fd, const void *buffer, unsigned length);
-// void seek (int fd, unsigned position);
-// unsigned tell (int fd);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
 void close (int fd);
 
 int insert_file_fdt(struct file *file);
@@ -59,7 +59,24 @@ static struct file *find_file_by_fd(int fd);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-
+struct file_descriptor *find_file_descriptor(int fd) {
+	struct list *fd_table = &thread_current()->fd_table;
+	ASSERT(fd_table != NULL);
+	ASSERT(fd > 1);
+	if (list_empty(fd_table)) 
+		return NULL;
+	struct file_descriptor *file_descriptor;
+	struct list_elem *e = list_begin(fd_table);
+	ASSERT(e != NULL);
+	while (e != list_tail(fd_table)) {
+		file_descriptor = list_entry(e, struct file_descriptor, fd_elem);
+		if (file_descriptor->fd == fd) {
+			return file_descriptor;
+		}
+		e = list_next(e);
+	}
+	return NULL;
+}
 
 /* An open file. */
 struct file {
@@ -112,9 +129,7 @@ syscall_handler (struct intr_frame *f) {
 		thread_exit();
 	}
 
-	// struct file_descriptor fd;
-
-	addr = f->R.rsi;
+	// addr = f->R.rsi;
 	
 	switch(f->R.rax){
 	case SYS_HALT:
@@ -130,7 +145,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_EXEC:
-		f->R.rax = exec(f->R.rsi);
+		f->R.rax = exec(f->R.rdi);
 		break;
 
 	case SYS_WAIT:
@@ -138,21 +153,16 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_CREATE:
-		f->R.rax = create(*(char*)(addr), PGSIZE);
+		f->R.rax = create(f->R.rdi, f->R.rsi);
 		break;
 
 	case SYS_REMOVE:
-		f->R.rax = remove(*(char*)(addr));
+		f->R.rax = remove(f->R.rdi);
 		break;
 		
 	case SYS_OPEN:
-		f->R.rax = open((char*)addr);
+		f->R.rax = open(f->R.rdi);
 		break;
-	
-	// case SYS_FILESIZE:
-	// 	filesize();
-		// f->R.rax = open(f->R.rdi);
-		// break;
 
 	case SYS_FILESIZE:
 		f->R.rax = filesize(f->R.rdi);
@@ -177,75 +187,100 @@ syscall_handler (struct intr_frame *f) {
 	case SYS_CLOSE:
 		close(f->R.rdi);
 		break;
+
 	default:
 		break;
 	}
 
 }
 
-struct file_descriptor *find_file_descriptor(int fd) {
-	struct list *fd_table = &thread_current()->fd_table;
-	ASSERT(fd_table != NULL);
-	ASSERT(fd > 1);
-	if (list_empty(fd_table)) 
-		return NULL;
-	struct file_descriptor *file_descriptor;
-	struct list_elem *e = list_begin(fd_table);
-	ASSERT(e != NULL);
-	while (e != list_tail(fd_table)) {
-		file_descriptor = list_entry(e, struct file_descriptor, fd_elem);
-		if (file_descriptor->fd == fd) {
-			return file_descriptor;
-		}
-		e = list_next(e);
-	}
-	return NULL;
-}
-
-void halt(void){
+//핀토스 종료
+void halt(void)
+{
 	power_off();
 }
-void exit(int status){
+
+//현재 유저 프로그램 종료 (status를 반환함)
+void exit(int status)
+{
 	char* p_name = thread_current ()->name;
 	char* p = "\0";
 	strtok_r(p_name," ",&p);
 	printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
 }
-bool create (const char *file, unsigned initial_size) {
-	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
+
+tid_t fork (const char *thread_name){
+	
+	process_fork(thread_name, thread_current()->tf);
+}
+
+//현재 프로세스를 file로 바꿈
+int exec (const char *file){
+	
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
 
+	char* file_in_kernel;
+	file_in_kernel = palloc_get_page(PAL_ZERO);
+
+	if (file_in_kernel == NULL)
+		exit(-1);
+	strlcpy(file_in_kernel, file, PGSIZE);
+	
+	if (process_exec(file_in_kernel) == -1)
+		return -1;
+}
+
+//자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
+int wait (tid_t t)
+{		
+	process_wait(t); 
+}
+
+//file이라는 파일을 만들고, 성공시 true 반환
+//파일 생성은 해당 파일을 열지는 않음. 열기 위해서는 open을 사용
+//메인 쓰레드의 fd_table 리스트에 할당
+bool create (const char *file, unsigned initial_size) 
+{
+	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
+		exit(-1);
+	
 	return filesys_create(file, initial_size);
 }
 
-int open (const char *file) {
+//file이라는 파일을 삭제
+//성공시 true 반환
+bool remove (const char *file)
+{
+	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
+		exit(-1);
+
+	return filesys_remove(file);
+}
+
+//file이라는 파일을 연다
+//fd반환
+int open (const char *file) 
+{
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
+
 	struct file *opened_file = filesys_open(file);
 	int fd = -1;
-	if (opened_file != NULL) 
+	if (opened_file != NULL){
 	 	fd = allocate_fd(opened_file, &thread_current()->fd_table);
-	
+		if (fd == -1){
+			file_close(opened_file);
+		}
+	} 
+
 	return fd;
 }
 
-void close (int fd) {
-	struct file_descriptor *file_desc = find_file_descriptor(fd);
-	if(file_desc == NULL)
-		return;
-	file_close(file_desc->file);
-	list_remove(&file_desc->fd_elem);
-	free(file_desc);
-
-}
-bool remove (const char *file)
-{
-	struct dir *dir = dir_open_root ();
-	bool success = dir != NULL && dir_remove (dir, file);
-	dir_close (dir);
-	return success;
-}
+//열린 파일 (fd로 식별)의 크기를 반환 (바이트 단위)
 int filesize (int fd)
 {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
@@ -253,6 +288,7 @@ int filesize (int fd)
 		return -1;
 	return file_length(file_desc->file);
 }
+
 int read (int fd, void *buffer, unsigned size)
 {
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
@@ -279,8 +315,11 @@ int read (int fd, void *buffer, unsigned size)
 	}
 	return byte;
 }
+
 int write (int fd, const void *buffer, unsigned size)
 {
+	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
+		exit(-1);
 	char* _buffer = buffer;
 	if(fd == 0)
 	{
@@ -293,7 +332,11 @@ int write (int fd, const void *buffer, unsigned size)
 	}
 	else
 	{
-
+		struct file_descriptor *file_desc = find_file_descriptor(fd);
+		if(file_desc == NULL)
+			return -1;
+		file_write(file_desc->file,_buffer,size);
+		return size;
 	}
 }
 
@@ -312,138 +355,24 @@ unsigned tell (int fd)
 		return -1;
 	file_tell(file_desc->file);
 }
-		close(f->R.rdi);
-		break;
-	}
 
-
-	// thread_exit ();
-}
-
-void halt(void)
-{
-	power_off();
-}
-
-void exit (int status)
-{
-	thread_current()->exit_status = status;
-	printf ("%s: exit(%d)\n", thread_current()->name, status);
-	thread_exit();
-}
-
-tid_t fork (const char *thread_name){
-	
-	process_fork(thread_name, thread_current()->tf);
-}
-
-int exec (const char *file){
-	
-	char* file_in_kernel;
-	file_in_kernel = palloc_get_page(PAL_ZERO);
-
-	if (file_in_kernel == NULL)
-		exit(-1);
-	strlcpy(file_in_kernel, file, PGSIZE);
-	
-	if (process_exec(file_in_kernel) == -1)
-		return -1;
-}
-
-int wait (tid_t t)
-{
-
-	process_wait(t); 
-}
-
-bool create (const char *file, unsigned initial_size)
-{
-	if(filesys_create(file, initial_size)== false)
-		return false;
-	return true;
-}
-
-bool remove (const char *file){
-	if(filesys_remove(file)==false)
-		return false;
-	return true;
-}
-
-int open (const char *file){
-	
-	struct file *open_file = filesys_open(file);
-	
-	if (file == NULL){
-		return -1;
-	}
-
-	int fd = insert_file_fdt(open_file);
-
-	if (fd == -1){
-		file_close(open_file);
-	}
-	return fd;
-	
-}
-
-// int filesize (int fd){
-
-// }
-int read (int fd, void *buffer, unsigned length)
-{
-	int byte = 0;
-	char* _buffer = buffer;
-	if(fd == 0)
-	{
-		while(byte < length)
-		{
-			_buffer[byte++]=input_getc();
-		}
-		return byte;
-	}
-	else if(fd == 1)
-	{
-		return -1;
-	}
-	else{
-
-	}
-}
-
-int write (int fd, const void *buffer, unsigned length){
-	char * _buffer = buffer;
-	if (fd == 0)
-	{
-		return -1;
-	}
-	else if (fd == 1){
-		putbuf(_buffer, length);
-		return length;
-	}
-}
-// void seek (int fd, unsigned position){
-
-// }
-// unsigned tell (int fd){
-
-// }
-void close (int fd){
-	
-	struct file *file;
-
-	file = find_file_by_fd(fd);
-	if (file== NULL){
+void close (int fd) {
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
 		return;
-	}
-
-	file_close(&file);
+	file_close(file_desc->file);
+	list_remove(&file_desc->fd_elem);
+	free(file_desc);
 }
 
+
+
+/* --------------------------------- */
 
 int insert_file_fdt(struct file *file)
 {
     struct thread *cur = thread_current();
-    struct file **fdt = cur->fd_table;
+    struct file **fdt = cur->descriptor_table;
 
     // Find open spot from the front
     //  fd 위치가 제한 범위 넘지않고, fd table의 인덱스 위치와 일치한다면
@@ -460,12 +389,12 @@ int insert_file_fdt(struct file *file)
     return cur->fd_idx;
 }
 
-static struct file *find_file_by_fd(int fd)
-{
-    struct thread *cur = thread_current();
-    if (fd < 0 || fd >= 10)
-    {
-        return NULL;
-    }
-    return cur->fd_table[fd];
-}
+// static struct file *find_file_by_fd(int fd)
+// {
+//     struct thread *cur = thread_current();
+//     if (fd < 0 || fd >= 10)
+//     {
+//         return NULL;
+//     }
+//     return cur->descriptor_table[fd];
+// }

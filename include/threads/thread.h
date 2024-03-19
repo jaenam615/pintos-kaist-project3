@@ -132,7 +132,7 @@ struct thread {
 	struct semaphore process_sema;
 	int exit_status; 
 	struct intr_frame parent_tf;
-	// struct file **fd_table;
+	struct file **descriptor_table;
 	int fd_idx;
 };
 

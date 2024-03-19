@@ -157,7 +157,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -251,38 +251,6 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-// void argument_stack(char ** box, int num, void ** rsp)
-// // 이름과 인자가 담긴 배열, 인자의 개수, 스택포인터 주소값
-// {
-// 	for(int i = num - 1; i>=0; --i)
-// 	{
-// 		for(int j = strlen(box[i]); j>=0; --j)
-// 		{
-// 			--(*rsp); // 스택의 주소 감소
-// 			**(char **)rsp = box[i][j]; // 주소에 문자하나 저장
-// 		}
-// 		box[i] = *(char**)rsp; // 주소값 저장(인자의 시작점)
-// 	}
-
-// 	int padding = (int)*rsp %8; // 인자만큼 패딩
-// 	for(int i = 0; i<padding; ++i)
-// 	{
-// 		--(*rsp);
-// 		**(uint8_t **)rsp = 0;
-// 	}
-
-// 	(*rsp) -= 8;
-// 	**(char ***)rsp = 0; //인자 문자열 종료 0 
-
-// 	for(int i = num -1; i >= 0; --i)
-// 	// 각 문자열의 주소를 넣어준다
-// 	{
-// 		(*rsp) -= 8;
-// 		**(char***)rsp = box[i];
-// 	}
-// 	(*rsp) -= 8;
-// 	**(void***)rsp = 0; // fake return address 추가
-// }
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
@@ -305,7 +273,7 @@ process_wait (tid_t child_tid) {
 	// list_entry();
 	// sema_down(&child_tid->process_sema);
 	// if ()
-	for (int i =0; i<1000000000; i++){
+	for (uint64_t i =0; i<4000000000; i++){
 
 	}
 
@@ -324,7 +292,6 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	
 	// sema_up(&curr->parent->process_sema);
-	process_cleanup ();
 	// try_thread_yield();
 }
 

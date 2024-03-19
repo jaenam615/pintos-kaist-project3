@@ -619,7 +619,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 #ifdef USERPROG
 	list_init(&t->fd_table);
 	t->last_created_fd = 2;
-	sema_init(&t->process_sema, 0);
+	// sema_init(&t->process_sema, 0);
 #endif
 
 	if (thread_mlfqs == true){
