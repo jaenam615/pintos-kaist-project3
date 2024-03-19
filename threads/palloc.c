@@ -258,7 +258,14 @@ palloc_init (void) {
    otherwise from the kernel pool.  If PAL_ZERO is set in FLAGS,
    then the pages are filled with zeros.  If too few pages are
    available, returns a null pointer, unless PAL_ASSERT is set in
-   FLAGS, in which case the kernel panics. */
+   FLAGS, in which case the kernel panics. 
+ * PAGE_CNT 연속 사용 가능 페이지 그룹을 가져와 반환합니다.
+ * PAL_USER가 설정되어 있으면 페이지는 사용자 풀, 
+ * 그렇지 않으면 커널 풀에서 가져옵니다. 
+ * FLAGs에서 PAL_ZERO가 설정되어 있으면 페이지는 0으로 채워집니다. 
+ * 페이지가 너무 적으면 FLAGs에서 PAL_ASSERT가 설정되어 있지 않으면 
+ * Null 포인터를 반환합니다. 이 경우 커널은 패닉 상태가 됩니다.
+ */
 void *
 palloc_get_multiple (enum palloc_flags flags, size_t page_cnt) {
 	struct pool *pool = flags & PAL_USER ? &user_pool : &kernel_pool;

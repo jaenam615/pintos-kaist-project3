@@ -20,7 +20,9 @@
         "syscall-nr.h": "c",
         "filesys.h": "c",
         "inode.h": "c",
-        "malloc.h": "c"
+        "malloc.h": "c",
+        "tests.h": "c",
+        "palloc.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

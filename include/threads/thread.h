@@ -184,7 +184,6 @@ void update_priority();
 void calculate_all_priority();
 void try_thread_yield();
 
-
 #endif /* threads/thread.h */
 
 #ifdef USERPROG

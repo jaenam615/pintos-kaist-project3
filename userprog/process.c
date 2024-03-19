@@ -101,10 +101,12 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_ ) {
 	/* Clone current thread to new thread.*/
+	thread_current()->tf = *if_;
+	printf("%d\n", if_->R.rsi);
 	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+			PRI_DEFAULT, __do_fork, thread_current());
 }
 
 #ifndef VM
@@ -121,22 +123,49 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	void *newpage;
 	bool writable;
 
-	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-
-	/* 2. Resolve VA from the parent's page map level 4. */
+	/* 1. TODO: If the parent_page is kernel page, then return immediately. 
+	 * 1. TODO: parent_page가 kernel page인 경우 즉시 반환합니다.
+	 */
+	if (is_kern_pte(pte))
+		return false;
+	/* 2. Resolve VA from the parent's page map level 4. 
+	 * 2. 부모 페이지 맵 레벨 4에서 VA를 해결합니다.
+	 */
 	parent_page = pml4_get_page (parent->pml4, va);
 
-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
-	 *    TODO: NEWPAGE. */
+	/* 3. TODO: Allocate new PAL_USER page for the child and set result to NEWPAGE. 
+	 * 3. TODO: 아이에게 새 PAL_USER 페이지를 할당하고 결과를 NEWPAGE로 설정합니다.
+	 */
+	current->pml4 = palloc_get_page (PAL_USER);
+	newpage = current->pml4
+	if (newpage == NULL)
+		return false;
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
-	 *    TODO: according to the result). */
+	 *    TODO: according to the result). 
+	 * 4. TODO: 부모 페이지를 새 페이지에 복제하고 
+	 * 부모 페이지의 쓰기 가능 여부를 확인합니다(결과에 따라 쓰기 가능하게 설정).
+	 */
+	if(current->pml4)
+	{
+		memcpy(newpage,parent_page,PGSIZE);
+		if((is_writable(pte)))
+			writable = true;
+		else
+			writable = false;
+	}
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
-	 *    permission. */
+	 *    permission. 
+	 * 5. 쓰기 가능한 권한으로 주소 VA의 어린이 페이지 테이블에 새 페이지를 추가합니다.
+	 */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
-		/* 6. TODO: if fail to insert page, do error handling. */
+		/* 6. TODO: if fail to insert page, do error handling. 
+		 * 6. 작업: 페이지를 삽입하지 못할 경우 오류 처리를 수행합니다.
+		 */
+		return false;
+
 	}
 	return true;
 }
@@ -155,8 +184,12 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) 
+	 * 어떻게든 parent_if를 전달해라.
+	 */
+	
+	struct intr_frame *parent_if = &parent->tf;
+	printf("%d\n", parent_if->R.rsi);
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -181,8 +214,23 @@ __do_fork (void *aux) {
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
-
+	 * TODO:       the resources of parent.
+	 * TODO: 코드가 여기에 있습니다.
+	 * TODO: 힌트) 파일 개체를 복제하려면 include/filesys/file.h에서 
+	 * 'file_duplicate'를 사용합니다. 
+	 * 이 함수가 부모의 리소스를 성공적으로 복제할 때까지 
+	 * 부모가 포크()에서 반환되어서는 안 됩니다.
+	 */
+	struct list_elem* e = list_begin(&parent->fd_table);
+	for(int i = 0; i< list_size(parent->fd_table); ++i)
+	{
+		struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
+		struct file_descriptor* tmp_file_desc;
+		tmp_file_desc->fd = file_desc->fd;
+		tmp_file_desc->file = file_duplicate(file_desc->file);
+		list_push_back(tmp_file_desc->fd_elem,current->fd_table);
+	}
+	
 	process_init ();
 
 	/* Finally, switch to the newly created process. */

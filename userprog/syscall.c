@@ -6,6 +6,8 @@
 #include "threads/loader.h"
 #include "threads/init.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
+#include "lib/user/syscall.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "filesys/filesys.h"
@@ -103,7 +105,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_FORK:
-		// fork(f->R.rdi);
+		f->R.rax = fork(f->R.rdi);
 		break;
 
 	case SYS_EXEC:
@@ -213,10 +215,9 @@ void close (int fd) {
 }
 bool remove (const char *file)
 {
-	struct dir *dir = dir_open_root ();
-	bool success = dir != NULL && dir_remove (dir, file);
-	dir_close (dir);
-	return success;
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
+		exit(-1);
+	return filesys_remove(file);
 }
 int filesize (int fd)
 {
@@ -291,10 +292,10 @@ unsigned tell (int fd)
 	file_tell(file_desc->file);
 }
 
-// pid_t fork (const char *thread_name)
-// {
-
-// }
+pid_t fork (const char *thread_name)
+{
+	return process_fork(thread_name,&thread_current()->tf);
+}
 // int exec (const char *file)
 // {
 
