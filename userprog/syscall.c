@@ -141,7 +141,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_FORK:
-		fork(thread_current()->name);
+		f->R.rax = fork(f->R.rdi);
 		break;
 
 	case SYS_EXEC:
@@ -149,7 +149,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_WAIT:
-		wait(t);
+		f->R.rax = wait(f->R.rdi);
 		break;
 	
 	case SYS_CREATE:
