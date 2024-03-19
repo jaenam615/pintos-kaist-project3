@@ -1,0 +1,27 @@
+Kernel command line: -q -f put multi-oom run multi-oom
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  102,400 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'multi-oom' into the file system...
+Executing 'multi-oom':
+(multi-oom) begin
+Kernel PANIC at ../../threads/mmu.c:223 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
+Call stack: 0x800421894c 0x800420d894 0x800421c0a9 0x800420d31e 0x800420d3d0 0x800420d475 0x800420d50d 0x800421c1d1 0x8004207d8d.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 244 ticks
+Thread: 37 idle ticks, 203 kernel ticks, 4 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 83 reads, 242 writes
+hd1:0: 107 reads, 0 writes
+Console: 1154 characters output
+Key

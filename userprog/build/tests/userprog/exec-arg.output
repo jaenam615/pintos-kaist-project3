@@ -1,0 +1,41 @@
+Kernel command line: -q -f put exec-arg put child-args run exec-arg
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  102,400 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 204 sector (102 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'exec-arg' into the file system...
+Putting 'child-args' into the file system...
+Executing 'exec-arg':
+(exec-arg) begin
+(exec-arg) I'm your father
+(args) begin
+(args) argc = 2
+(args) argv[0] = 'child-args'
+(args) argv[1] = 'childarg'
+Page fault at 0x23f: not present error reading page in user context.
+exec-arg: dying due to interrupt 0x0e (#PF Page-Fault Exception).
+Interrupt 0x0e (#PF Page-Fault Exception) at rip=402e98
+ cr2=000000000000023f error=               4
+rax 000000000000023f rbx 00000000000003f9 rcx 0000000000000018 rdx 000000000000023f
+rsp 000000004747fde8 rbp 000000004747fe08 rsi ffffffffffffffff rdi 000000000000023f
+rip 0000000000402e98 r8 000000004747fe40  r9 0000000000401026 r10 0000000000000000
+r11 0000000000000202 r12 00008004240e1000 r13 00008004229c0800 r14 00000104240e0000
+r15 0000800420a9f800 rflags 00000206
+es: 001b ds: 001b cs: 0023 ss: 001b
+Execution of 'exec-arg' complete.
+Timer: 1232 ticks
+Thread: 42 idle ticks, 1190 kernel ticks, 1 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 154 reads, 446 writes
+hd1:0: 204 reads, 0 writes
+Console: 1619 characters output
+Keyboard: 0 keys pressed
+Exception: 1 page faults
+Powering off...

@@ -190,24 +190,36 @@ strstr (const char *haystack, const char *needle) {
    is the next token in the string, or a null pointer if no
    tokens remain.
 
+   문자열을 DELIMITER로 구분된 토큰으로 바꿉니다. 
+   이 함수가 처음 호출될 때는 S가 토큰화할 문자열이어야 하며 이후 호출에서는 null 포인터여야 합니다. 
+   SAVE_PTR은 토큰화자의 위치를 추적하는 데 사용되는 'char *' 변수의 주소입니다. 
+   매번 반환되는 값은 문자열의 다음 토큰이거나 토큰이 남아 있지 않으면 null 포인터입니다.
+
    This function treats multiple adjacent delimiters as a single
    delimiter.  The returned tokens will never be length 0.
    DELIMITERS may change from one call to the next within a
    single string.
+
+   이 함수는 인접한 여러 개의 구분 기호를 하나의 구분 기호로 취급합니다. 
+   반환된 토큰은 절대 길이가 0이 되지 않습니다. 
+   구분 기호는 하나의 문자열 내에서 한 호출에서 다음 호출로 변경될 수 있습니다.
 
    strtok_r() modifies the string S, changing delimiters to null
    bytes.  Thus, S must be a modifiable string.  String literals,
    in particular, are *not* modifiable in C, even though for
    backward compatibility they are not `const'.
 
+   strtok_r()은 문자열 S를 수정하여 구분자를 null 바이트로 변경합니다. 
+   따라서 S는 수정 가능한 문자열이어야 합니다. 
+   특히 문자열 리터럴은 이전 호환성을 위해 'const'가 아니더라도 C에서 *not* 수정 가능합니다.
+
    Example usage:
 
    char s[] = "  String to  tokenize. ";
    char *token, *save_ptr;
 
-   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
-   token = strtok_r (NULL, " ", &save_ptr))
-   printf ("'%s'\n", token);
+   for (token = strtok_r (s, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr))
+   	printf ("'%s'\n", token);
 
 outputs:
 

@@ -147,6 +147,7 @@ thread_init (void) {
 	list_init (&destruction_req);
 	list_init (&sleep_list);
 	list_init (&all_list);
+
 	load_avg = 0;
 	
 	/* Set up a thread structure for the running thread. */
@@ -219,7 +220,7 @@ thread_print_stats (void) {
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
-thread_create (const char *name, int priority,
+ thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
 	tid_t tid;
@@ -255,7 +256,7 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 	if (thread_get_priority() < priority)
-		try_thread_yield();		
+		thread_yield();		
 
 	return tid;
 }
@@ -394,8 +395,11 @@ thread_set_priority (int new_priority) {
 }
 
 void try_thread_yield(void){
-	if(!list_empty(&ready_list) && thread_current == idle_thread)
-		thread_yield;
+	if(!list_empty(&ready_list) && thread_current() != idle_thread )
+	{
+		if(thread_get_priority()<list_entry(list_begin(&ready_list),struct thread, elem)->priority)
+			thread_yield();
+	}	
 }
 
 /* Returns the current thread's priority. */
@@ -608,11 +612,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 	t->has_lock = 0;
 	t->wait_on_lock = NULL;
+	
 	list_init(&t->donors);
 	list_push_back(&all_list, &t->all_elem);
-	
-	
+	//merged - check
 #ifdef USERPROG
+	list_init(&t->fd_table);
+	t->last_created_fd = 2;
 	sema_init(&t->process_sema, 0);
 #endif
 
@@ -873,3 +879,18 @@ static bool advanced_scheduling(const struct list_elem *a_, const struct list_el
 
 	return a->priority > b->priority;
 }
+
+#ifdef USERPROG
+int allocate_fd(struct file *file, struct list *fd_table)
+{
+	struct file_descriptor* file_descriptor;
+	file_descriptor = malloc(sizeof(struct file_descriptor));
+	if(file_descriptor == NULL)
+		return -1;
+	file_descriptor->fd = (thread_current()->last_created_fd)++;
+	file_descriptor->file = file;
+	list_push_back(fd_table,&file_descriptor->fd_elem);
+	return file_descriptor->fd;
+}
+
+#endif
