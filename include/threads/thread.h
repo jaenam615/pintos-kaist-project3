@@ -29,10 +29,6 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-// 추가 부분
-#define FDT_PAGES 3		// pages to allocate for file descriptor tables (thread_create, process_exit)
-#define FDCOUNT_LIMIT FDT_PAGES *(1<<9) 
-
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -124,7 +120,7 @@ struct thread {
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
-	unsigned magic;                     /* Detects stack overflow. */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+	unsigned magic;                     /* Detects stack overflow. */
 };
 
 struct file_descriptor

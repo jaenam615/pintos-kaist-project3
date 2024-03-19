@@ -53,8 +53,8 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 int exec (const char *file);
+pid_t fork (const char *thread_name);
 // int wait (pid_t pid);
-// pid_t fork (const char *thread_name);
 
 void
 syscall_init (void) {
@@ -291,8 +291,9 @@ unsigned tell (int fd)
 	file_tell(file_desc->file);
 }
 
-// pid_t fork (const char *thread_name)
-// {
+pid_t fork (const char *thread_name) {
+	
+}
 
 // }
 // int exec (const char *file)
