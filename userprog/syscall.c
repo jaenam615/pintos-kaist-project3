@@ -123,11 +123,11 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_CREATE:
-		create(*(char*)(addr), PGSIZE);
+		f->R.rax = create(*(char*)(addr), PGSIZE);
 		break;
 
 	case SYS_REMOVE:
-		remove(*(char*)(addr));
+		f->R.rax = remove(*(char*)(addr));
 		break;
 		
 	case SYS_OPEN:
@@ -142,7 +142,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 		
 	case SYS_WRITE:
-		write(f->R.rdi, f->R.rsi, f->R.rdx);
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
 	// case SYS_SEEK:
