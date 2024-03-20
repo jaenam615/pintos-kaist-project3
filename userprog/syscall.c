@@ -7,7 +7,7 @@
 #include "threads/init.h"
 #include "userprog/gdt.h"
 #include "userprog/process.h"
-#include "lib/user/syscall.h"
+// #include "lib/user/syscall.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -21,7 +21,7 @@ void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void halt (void);
 void exit (int status);
-tid_t fork (const char *thread_name);
+tid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (const char *file);
 int wait (tid_t);
 bool create (const char *file, unsigned initial_size);
@@ -145,7 +145,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_FORK:
-		f->R.rax = fork(f->R.rdi);
+		f->R.rax = fork(f->R.rdi, f);
 		break;
 
 	case SYS_EXEC:
@@ -215,9 +215,9 @@ void exit(int status)
 	thread_exit();
 }
 
-tid_t fork (const char *thread_name){
+tid_t fork (const char *thread_name, struct intr_frame *f){
 	
-	return process_fork(thread_name, &thread_current()->tf);
+	return process_fork(thread_name, f);
 }
 
 //현재 프로세스를 file로 바꿈
@@ -231,7 +231,7 @@ int exec (const char *file){
 
 	if (file_in_kernel == NULL)
 		exit(-1);
-	strlcpy(file_in_kernel, file, strlen(file) +1);
+	strlcpy(file_in_kernel, file, PGSIZE);
 	
 	if (process_exec(file_in_kernel) == -1)
 		return -1;	
@@ -252,7 +252,10 @@ bool create (const char *file, unsigned initial_size)
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
 		exit(-1);
 	
-	return filesys_create(file, initial_size);
+	lock_acquire(&filesys_lock);
+	bool success = filesys_create(file, initial_size);
+	lock_release(&filesys_lock);
+	return success;
 }
 
 //file이라는 파일을 삭제
@@ -268,36 +271,55 @@ bool remove (const char *file)
 
 //file이라는 파일을 연다
 //fd반환
+
 int open (const char *file) 
 {
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
-
-	// struct file *opened_file = filesys_open(file);
-	// if (opened_file == NULL){
-	// 	return -1;
-	// }
-	
-	// int fd = allocate_fd(opened_file, &thread_current()->fd_table);
-
-	// return fd;
-
-	// check_address(file);
-	if (thread_current()->last_created_fd > 20)
-	{
-		return -1;
-	}
-	if (*file == NULL)
-		return -1;
-
+	lock_acquire(&filesys_lock);
 	struct file *open_file = filesys_open(file);
-	if (open_file == NULL)
-		return -1;
-	int fd = process_add_file(open_file);
-
+	int fd = -1;
+	if(open_file == NULL){
+		lock_release(&filesys_lock);
+		return fd;
+	}
+	fd = allocate_fd(open_file, &thread_current()->fd_table);
+	if (fd == -1)
+		file_close(open_file);
+	lock_release(&filesys_lock);
 	return fd;
-
 }
+
+// int open (const char *file) 
+// {
+// 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
+// 		exit(-1);
+
+// 	// struct file *opened_file = filesys_open(file);
+// 	// if (opened_file == NULL){
+// 	// 	return -1;
+// 	// }
+	
+// 	// int fd = allocate_fd(opened_file, &thread_current()->fd_table);
+
+// 	// return fd;
+
+// 	// check_address(file);
+// 	if (thread_current()->last_created_fd > 20)
+// 	{
+// 		return -1;
+// 	}
+// 	if (*file == NULL)
+// 		return -1;
+
+// 	struct file *open_file = filesys_open(file);
+// 	if (open_file == NULL)
+// 		return -1;
+// 	int fd = process_add_file(open_file);
+
+// 	return fd;
+
+// }
 
 void close (int fd) {
 	// struct file_descriptor *file_desc = find_file_descriptor(fd);
