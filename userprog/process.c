@@ -30,10 +30,16 @@
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
-static void __do_fork (void *);
+
 void argument_stack(char** argv, int argc, struct intr_frame *if_);
 struct thread *get_thread_from_tid(tid_t thread_id);
 
+struct fork_data
+{
+	struct thread *parent;
+	struct intr_frame *user_level_f;
+};
+static void __do_fork (struct fork_data *aux);
 // //구현
 // static char parse_options (char **argv);
 
@@ -104,14 +110,18 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
 	// thread_current()->tf = if_;
+	struct fork_data my_data;
+	my_data.parent = thread_current();
+	my_data.user_level_f = if_;
+
 	struct thread *cur = thread_current();
 	memcpy(&cur->parent_tf, if_, sizeof(struct intr_frame));
 
-	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, cur);
-	if (tid = TID_ERROR){
+	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, &my_data);
+	if (tid == TID_ERROR){
 		return TID_ERROR;
 	}
 
@@ -119,6 +129,8 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_down(&child->process_sema);
 	if(child->exit_status == TID_ERROR)
 	{
+		sema_up(&child->exit_sema);
+		
 		return TID_ERROR;
 	}
 
@@ -153,7 +165,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
+	newpage = palloc_get_page(PAL_USER);
 	if (newpage == NULL){
 		return false;
 	}
@@ -188,15 +200,15 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  * 즉, process_fork의 두 번째 인수를 이 함수에 전달해야 합니다.
  */
 static void
-__do_fork (void *aux) {
+__do_fork (struct fork_data *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	struct thread *parent = aux->parent;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) 
 	 * 어떻게든 parent_if를 전달해라.
 	 */
 	
-	struct intr_frame *parent_if = &parent->parent_tf;
+	struct intr_frame *parent_if = aux->user_level_f;
 
 	bool succ = true;
 
@@ -224,17 +236,37 @@ __do_fork (void *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
-	struct list_elem* e = list_begin(&parent->fd_table);
-		for(int i = 0; i< list_size(&parent->fd_table); ++i)
-		{
-			struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
-			struct file_descriptor* tmp_file_desc;
-			tmp_file_desc->fd = file_desc->fd;
-			tmp_file_desc->file = file_duplicate(file_desc->file);
-			list_push_back(&tmp_file_desc->fd_elem,&current->fd_table);
+	// struct list_elem* e = list_begin(&parent->fd_table);
+	// 	for(int i = 0; i< list_size(&parent->fd_table); ++i)
+	// 	{
+	// 		struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
+	// 		struct file_descriptor* tmp_file_desc;
+	// 		tmp_file_desc->fd = file_desc->fd;
+	// 		tmp_file_desc->file = file_duplicate(file_desc->file);
+	// 		list_push_back(&tmp_file_desc->fd_elem,&current->fd_table);
 			
+	// 	}
+	// current->last_created_fd = parent->last_created_fd;
+
+	struct list_elem* e = list_begin(&parent->fd_table);
+	struct list *parent_list = &parent->fd_table;
+	if(!list_empty(parent_list)){
+		for (e ; e != list_end(parent_list) ; e = list_next(e)){
+			struct file_descriptor* parent_fd =list_entry(e,struct file_descriptor, fd_elem);
+			if(parent_fd->file != NULL){
+				struct file_descriptor *child_fd = malloc(sizeof(struct file_descriptor));
+				child_fd->file = file_duplicate(parent_fd->file);
+				child_fd->fd = parent_fd->fd;
+				list_push_back(&current->fd_table, & child_fd->fd_elem);
+			}
+			current->last_created_fd = parent->last_created_fd;
 		}
-	current->last_created_fd = parent->last_created_fd;
+		current->last_created_fd = parent->last_created_fd;
+	} else {
+		current->last_created_fd = parent->last_created_fd;
+	}
+
+	if_.R.rax = 0;
 
     // 로드가 완료될 때까지 기다리고 있던 부모 대기 해제
     sema_up(&current->process_sema);
@@ -244,7 +276,7 @@ __do_fork (void *aux) {
     if (succ)
         do_iret(&if_);
 error:
-    sema_up(&current->process_sema);
+    // sema_up(&current->process_sema);
     exit(TID_ERROR);
 }
 
@@ -349,15 +381,19 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *t = thread_current();
 
+
+	if (t->pml4 != NULL){
+		printf("%s: exit(%d)\n", t->name, t->exit_status);
+		file_close(t->running);
+		t->running = NULL;
+	}
+
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
 	for(int i = 2; i< t->last_created_fd; ++i)
 		close(i);
-	// int fd = 2; 
-	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
-	// 	fd ++;
-	// 	close (fd);	
-	// }
+
+
 	file_close(t->running);
 	process_cleanup();
 	sema_up(&t->wait_sema);
