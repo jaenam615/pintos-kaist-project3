@@ -281,7 +281,8 @@ int open (const char *file)
 		lock_release(&filesys_lock);
 		return fd;
 	}
-	fd = allocate_fd(open_file, &thread_current()->fd_table);
+	// fd = allocate_fd(open_file, &thread_current()->fd_table);
+	fd = process_add_file(open_file);
 	if (fd == -1)
 		file_close(open_file);
 	lock_release(&filesys_lock);
