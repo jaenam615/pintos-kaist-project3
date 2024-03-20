@@ -8,8 +8,8 @@ Project 2 User Programs:
 Argument Passing
 
 ---
-|------------|----------------|------------|------------|
-| Address	 |  Name	      |  Data	   | Type       |   
+| Address	 |  Name	      |  Data	   | Type       |  
+|---|---|---|---|
 |0x4747fffc	 |  argv[3][...]  | 'bar\0'	   |char[4]     |     
 |0x4747fff8	 |   argv[2][...] | 'foo\0'	   |char[4]     |     
 |0x4747fff5	 |   argv[1][...] | '-l\0'	   |char[3]     |      
