@@ -23,7 +23,8 @@
         "malloc.h": "c",
         "tests.h": "c",
         "palloc.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "interrupt.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
