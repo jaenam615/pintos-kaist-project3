@@ -307,22 +307,22 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
-	char *stk[64];
-   	char *token, *save_ptr;
-	int i = 0; 
+	// char *stk[64];
+   	// char *token, *save_ptr;
+	// int i = 0; 
 
-   	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
-		stk[i] = token;
-		i++;
-	}
+   	// for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+	// 	stk[i] = token;
+	// 	i++;
+	// }
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
-	argument_stack(stk, i, &_if);
 	// argument_stack(stk, i, &_if);
-	_if.R.rdi = i;
-	_if.R.rsi = (char*)_if.rsp + 8;
+	// // argument_stack(stk, i, &_if);
+	// _if.R.rdi = i;
+	// _if.R.rsi = (char*)_if.rsp + 8;
 
 
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
@@ -528,13 +528,34 @@ load (const char *file_name, struct intr_frame *if_) {
 	struct file *file = NULL;
 	off_t file_ofs;
 	bool success = false;
-	int i;
+	// int i;
 	
+	int i, j;
+	char *next_ptr;
+	char *process_name;
+	char *token;
+	uintptr_t stack_ptr;
+	char *argv[LOADER_ARGS_LEN / 2 + 1];
+	char *token_argv[LOADER_ARGS_LEN / 2 + 1];
+	int argc = 0;
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
+
+	process_name = strtok_r(file_name, " ", &next_ptr);
+	token_argv[argc] = process_name;
+
+	while (token != NULL)
+	{
+		// 인자(token) 분리해주는 과정 & argc 구하기
+		argc++;
+		token = strtok_r(NULL, " ", &next_ptr);
+		token_argv[argc] = token;
+	}
+
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
@@ -610,10 +631,43 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
+	stack_ptr = if_->rsp;
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	for (i = argc - 1; i > -1; i--)
+		{
+			stack_ptr -= (strlen(token_argv[i]) + 1);
+			memcpy(stack_ptr, token_argv[i], strlen(token_argv[i]) + 1);
+			argv[i] = stack_ptr;
+		}
 
+		// word-align - 8의 배수로 맞춘다(padding)
+		// x86-64의 stack alignmet 규칙에 따르면 return address를 제외하고 직전까지의 상황에서 %rsprk 16
+		if ((if_->rsp - stack_ptr) % 8)
+		{
+			int p_size = (8 - ((if_->rsp - stack_ptr) % 8));
+			stack_ptr -= (8 - ((if_->rsp - stack_ptr) % 8));
+			memset(stack_ptr, 0, p_size);
+		}
+
+		// argv의 마지막을 null로 한다 -> 인자을 끝을 알린다.
+		stack_ptr -= 8;
+		memset(stack_ptr, 0, 8);
+
+		// 인자를 저장한 주소를 스택에 저장한다.
+		stack_ptr -= (argc * (sizeof(argv[0]) / sizeof(char)));
+		memcpy(stack_ptr, argv, argc * (sizeof(argv[0]) / sizeof(char)));
+
+		// Push Fake Return Address
+		stack_ptr -= 8;
+		memset(stack_ptr, 0, 8);
+
+		if_->rsp = stack_ptr;
+
+		// rsi가 argv의 주소(argv[0]의 주소를 가리키게 하고, rdi를 argc로 설정합니다.
+		if_->R.rsi = stack_ptr + 8;
+		if_->R.rdi = argc;
 	success = true;
 
 done:
@@ -863,6 +917,7 @@ void argument_stack (char **argv, int argc, struct intr_frame *if_){
 	}
 
 	address -= 8;
+	memset(address, 0, sizeof(char*));
 
 	for (int i = argc; i>=0; i-- ){
 		address -= 8;
