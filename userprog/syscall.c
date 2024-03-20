@@ -6,6 +6,8 @@
 #include "threads/loader.h"
 #include "threads/init.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
+#include "lib/user/syscall.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -14,7 +16,6 @@
 #include "lib/string.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -35,6 +36,8 @@ void close (int fd);
 
 int insert_file_fdt(struct file *file);
 static struct file *find_file_by_fd(int fd);
+int process_add_file(struct file *f); 
+
 /* System call.
  *
  * 사용자 프로세스가 커널 기능에 액세스하기를 원할 때마다 시스템 호출을 호출합니다. 
@@ -100,7 +103,7 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
-	
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -204,11 +207,11 @@ void halt(void)
 //현재 유저 프로그램 종료 (status를 반환함)
 void exit(int status)
 {
-	char* p_name = thread_current ()->name;
-	char* p = "\0";
+	// char* p_name = thread_current ()->name;
+	// char* p = "\0";
 	thread_current()->exit_status = status;
-	strtok_r(p_name," ",&p);
-	printf ("%s: exit(%d)\n", p_name, status);
+	// strtok_r(p_name," ",&p);
+	// printf ("%s: exit(%d)\n", p_name, status);
 	thread_exit();
 }
 
@@ -232,12 +235,13 @@ int exec (const char *file){
 	
 	if (process_exec(file_in_kernel) == -1)
 		return -1;
+
+		
 }
 
 //자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
 int wait (tid_t t)
 {		
-
 	return process_wait(t); 
 }
 
@@ -271,19 +275,56 @@ int open (const char *file)
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
 
-	struct file *opened_file = filesys_open(file);
-	int fd = -1;
-	if (opened_file != NULL){
-	 	fd = allocate_fd(opened_file, &thread_current()->fd_table);
-		if (fd == -1){
-			file_close(opened_file);
-		}
-	} 
+	// struct file *opened_file = filesys_open(file);
+	// if (opened_file == NULL){
+	// 	return -1;
+	// }
+	
+	// int fd = allocate_fd(opened_file, &thread_current()->fd_table);
+
+	// return fd;
+
+	// check_address(file);
+	if (thread_current()->last_created_fd > 20)
+	{
+		return -1;
+	}
+	if (*file == NULL)
+		return -1;
+
+	struct file *open_file = filesys_open(file);
+	if (open_file == NULL)
+		return -1;
+	int fd = process_add_file(open_file);
 
 	return fd;
+
 }
 
-//열린 파일 (fd로 식별)의 크기를 반환 (바이트 단위)
+void close (int fd) {
+	// struct file_descriptor *file_desc = find_file_descriptor(fd);
+	// if(file_desc == NULL)
+	// 	return;
+	// file_close(file_desc->file);
+	// list_remove(&file_desc->fd_elem);
+	// free(file_desc);
+
+	struct thread *curr = thread_current();
+	struct list_elem *start;
+	for (start = list_begin(&curr->fd_table); start != list_end(&curr->fd_table); start = list_next(start))
+	{
+		struct file_descriptor *close_fd = list_entry(start, struct file_descriptor, fd_elem);
+		if (close_fd->fd == fd)
+		{
+			file_close(close_fd->file);
+			list_remove(&close_fd->fd_elem);
+			// close_fd->fd = NULL;
+			// free(close_fd);
+		}
+	}
+	return;
+
+}
 int filesize (int fd)
 {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
@@ -359,45 +400,35 @@ unsigned tell (int fd)
 	return file_tell(&file_desc->file);
 }
 
-void close (int fd) {
-	struct file_descriptor *file_desc = find_file_descriptor(fd);
-	if(file_desc == NULL)
-		return;
-	file_close(file_desc->file);
-	list_remove(&file_desc->fd_elem);
-	free(file_desc);
+// pid_t fork (const char *thread_name)
+// {
+
+// }
+// int exec (const char *file)
+// {
+
+// }
+// int wait (pid_t pid)
+// {
+
+// }
+int process_add_file(struct file *f)
+{
+	struct thread *curr = thread_current();
+	struct file_descriptor *new_fd = malloc(sizeof(struct file_descriptor));
+
+	// curr에 있는 fd_list의 fd를 확인하기 위한 작업
+	// list_begin 했을 경우 fd = 0 출력되고, list_back 했을 경우 fd = 1 출력됨
+	// struct list_elem *check = list_begin(&curr->fd_list);
+	// struct file_fd *check_fd = list_entry(check, struct file_fd, fd_elem);
+	// printf("%d\n", check_fd->fd);
+	// 악 대박 fd 나옴 ~!~!
+
+	curr->last_created_fd += 1;
+	new_fd->fd = curr->last_created_fd;
+	new_fd->file = f;
+	// printf(" new fd : %d \n", new_fd->fd);
+	list_push_back(&curr->fd_table, &new_fd->fd_elem);
+
+	return new_fd->fd;
 }
-
-
-
-/* --------------------------------- */
-
-// int insert_file_fdt(struct file *file)
-// {
-//     struct thread *cur = thread_current();
-//     struct file **fdt = cur->descriptor_table;
-
-//     // Find open spot from the front
-//     //  fd 위치가 제한 범위 넘지않고, fd table의 인덱스 위치와 일치한다면
-//     while (cur->fd_idx < 10 && fdt[cur->fd_idx])
-//     {
-//         cur->fd_idx++;
-//     }
-
-//     // error - fd table full
-//     if (cur->fd_idx >= 10)
-//         return -1;
-
-//     fdt[cur->fd_idx] = file;
-//     return cur->fd_idx;
-// }
-
-// static struct file *find_file_by_fd(int fd)
-// {
-//     struct thread *cur = thread_current();
-//     if (fd < 0 || fd >= 10)
-//     {
-//         return NULL;
-//     }
-//     return cur->descriptor_table[fd];
-// }

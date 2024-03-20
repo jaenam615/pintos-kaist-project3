@@ -251,6 +251,8 @@ tid_t
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+
 	// t->tf.rsp = USER_STACK;
   	list_push_back(&thread_current()->child_list, &t->child_list_elem);
 	/* Add to run queue. */
@@ -626,6 +628,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	sema_init(&t->process_sema, 0);
 	list_init(&t->process_sema.waiters);
 	t->last_created_fd = 2;
+
 	// sema_init(&t->process_sema, 0);
 #endif
 
