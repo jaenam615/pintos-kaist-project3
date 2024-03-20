@@ -11,4 +11,4 @@ PintOS_Project
 
 [PROJECT 1 WIL](https://github.com/jaenam615/pintos-kaist/blob/main/WEEK_1_WIL.md)  
 
-[PROJECT 2 WIL](https://github.com/jaenam615/pintos-kaist/blob/main/WEEK_1_WIL.md)
+[PROJECT 2 WIL](https://github.com/jaenam615/pintos-kaist/blob/main/WEEK_2_WIL.md)
