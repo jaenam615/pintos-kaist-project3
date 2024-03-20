@@ -220,8 +220,7 @@ thread_print_stats (void) {
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
- thread_create (const char *name, int priority,
-		thread_func *function, void *aux) {
+ thread_create (const char *name, int priority, thread_func *function, void *aux) {
 	struct thread *t;
 	tid_t tid;
 
@@ -899,4 +898,5 @@ int allocate_fd(struct file *file, struct list *fd_table)
 	list_push_back(fd_table,&file_descriptor->fd_elem);
 	return file_descriptor->fd;
 }
+
 #endif

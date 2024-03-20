@@ -6,6 +6,8 @@
 #include "threads/loader.h"
 #include "threads/init.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
+#include "lib/user/syscall.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -100,7 +102,7 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
-	
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -237,7 +239,6 @@ int exec (const char *file){
 //자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
 int wait (tid_t t)
 {		
-
 	return process_wait(t); 
 }
 
@@ -282,8 +283,15 @@ int open (const char *file)
 
 	return fd;
 }
+void close (int fd) {
+	struct file_descriptor *file_desc = find_file_descriptor(fd);
+	if(file_desc == NULL)
+		return;
+	file_close(file_desc->file);
+	list_remove(&file_desc->fd_elem);
+	free(file_desc);
 
-//열린 파일 (fd로 식별)의 크기를 반환 (바이트 단위)
+}
 int filesize (int fd)
 {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
@@ -359,45 +367,15 @@ unsigned tell (int fd)
 	return file_tell(&file_desc->file);
 }
 
-void close (int fd) {
-	struct file_descriptor *file_desc = find_file_descriptor(fd);
-	if(file_desc == NULL)
-		return;
-	file_close(file_desc->file);
-	list_remove(&file_desc->fd_elem);
-	free(file_desc);
-}
-
-
-
-/* --------------------------------- */
-
-// int insert_file_fdt(struct file *file)
+// pid_t fork (const char *thread_name)
 // {
-//     struct thread *cur = thread_current();
-//     struct file **fdt = cur->descriptor_table;
 
-//     // Find open spot from the front
-//     //  fd 위치가 제한 범위 넘지않고, fd table의 인덱스 위치와 일치한다면
-//     while (cur->fd_idx < 10 && fdt[cur->fd_idx])
-//     {
-//         cur->fd_idx++;
-//     }
-
-//     // error - fd table full
-//     if (cur->fd_idx >= 10)
-//         return -1;
-
-//     fdt[cur->fd_idx] = file;
-//     return cur->fd_idx;
 // }
-
-// static struct file *find_file_by_fd(int fd)
+// int exec (const char *file)
 // {
-//     struct thread *cur = thread_current();
-//     if (fd < 0 || fd >= 10)
-//     {
-//         return NULL;
-//     }
-//     return cur->descriptor_table[fd];
+
+// }
+// int wait (pid_t pid)
+// {
+
 // }
