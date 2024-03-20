@@ -341,24 +341,10 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
-	// char *stk[64];
-   	// char *token, *save_ptr;
-	// int i = 0; 
-
-   	// for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
-	// 	stk[i] = token;
-	// 	i++;
-	// }
-
 	/* And then load the binary */
 	lock_acquire(&filesys_lock);
 	success = load (file_name, &_if);
 	lock_release(&filesys_lock);
-
-	// argument_stack(stk, i, &_if);
-	// _if.R.rdi = i;
-	// _if.R.rsi = (char*)_if.rsp + 8;
-
 
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
@@ -658,13 +644,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	argument_stack(stk, argc, if_);
-
 	/* TODO: Your code goes here.
 	//  * TODO: Implement argument passing (see project2/argument_passing.html). */
-
+	argument_stack(stk, argc, if_);
 	if_->R.rsi = if_->rsp + 8;
 	if_->R.rdi = argc;	
+
 	success = true;
 
 done:
