@@ -3,7 +3,12 @@
    acquiring one of the locks and thus donate their priority to
    the main thread.  The main thread releases the locks in turn
    and relinquishes its donated priorities.
-   
+// 메인 스레드는 잠금 A와 B를 획득한 다음, 
+// 더 높은 우선 순위의 두 개의 스레드를 생성합니다. 
+// 이 스레드들은 각각 잠금 중 하나를 획득하는 것을 차단하고 따라서 
+// 그 우선 순위를 메인 스레드에 기부합니다. 
+// 메인 스레드는 차례로 잠금을 해제하고 기부된 우선 순위를 포기합니다
+
    Based on a test originally submitted for Stanford's CS 140 in
    winter 1999 by Matt Franklin <startled@leland.stanford.edu>,
    Greg Hutchins <gmh@leland.stanford.edu>, Yu Ping Hu

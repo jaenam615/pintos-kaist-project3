@@ -1,0 +1,29 @@
+{
+    "files.associations": {
+        "synch.h": "c",
+        "list.h": "c",
+        "thread.h": "c",
+        "process.h": "c",
+        "syscall.h": "c",
+        "inttypes.h": "c",
+        "*.inc": "c",
+        "init.h": "c",
+        "gdt.h": "c",
+        "intr-stubs.h": "c",
+        "file.h": "c",
+        "flags.h": "c",
+        "intrinsic.h": "c",
+        "debug.h": "c",
+        "stddef.h": "c",
+        "main.h": "c",
+        "off_t.h": "c",
+        "syscall-nr.h": "c",
+        "filesys.h": "c",
+        "inode.h": "c",
+        "malloc.h": "c",
+        "tests.h": "c",
+        "palloc.h": "c",
+        "stdio.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
+}

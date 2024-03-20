@@ -5,10 +5,13 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "devices/timer.h"
+#include "filesys/file.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -91,13 +94,27 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
+	int original_priority;				/* 원래의 우선도(priority)*/
+	int64_t sleep_ticks; 				/* 자고 있는 시간*/
+	int has_lock;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem donor_elem;
 
+	struct list donors;					/* 해당 쓰레드에 기부한 목록*/
+	struct lock *wait_on_lock;			/* 이 락이 없어서 못 가고 있을 때*/
+
+	int nice_value;
+	int recent_cpu;
+	struct list_elem all_elem;
+	
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	struct list fd_table;
+	unsigned last_created_fd;
+
+
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -107,7 +124,34 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+
+	//구현
+	struct list child_list;
+	struct list_elem child_list_elem;
+
+	struct thread *parent;
+
+
+	int exit_status; 
+
+	struct intr_frame parent_tf;
+	// struct file **descriptor_table;
+	int fd_idx;
+
+	struct file *running;
+	/* 자식 프로세스의 fork가 완료될 때까지 기다리도록 하기 위한 세마포어 */
+	struct semaphore process_sema;
+	struct semaphore wait_sema;
+	struct semaphore exit_sema;
 };
+
+struct file_descriptor
+{
+	unsigned fd;
+	struct file* file;
+	struct list_elem fd_elem;
+};
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -143,4 +187,27 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+//구현목록
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
+
+
+void update_load_avg();
+void apply_to_all();
+int calculating_recent_cpu(struct thread* t);
+struct list all_list;
+struct list ready_list;
+
+void calc_all_recent_cpu();
+bool priority_scheduling(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
+
+void update_priority();
+void calculate_all_priority();
+void try_thread_yield();
+
 #endif /* threads/thread.h */
+
+#ifdef USERPROG
+int allocate_fd(struct file *file, struct list *fd_table);
+#endif

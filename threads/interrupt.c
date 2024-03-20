@@ -100,7 +100,11 @@ static const char *intr_names[INTR_CNT];
    sleep, although they may invoke intr_yield_on_return() to
    request that a new process be scheduled just before the
    interrupt returns. */
+
+
+// 외부 인터럽트를 처리하고 있습니까?
 static bool in_external_intr;   /* Are we processing an external interrupt? */
+// 인터럽트 반환을 양보해야 합니까?
 static bool yield_on_return;    /* Should we yield on interrupt return? */
 
 /* Programmable Interrupt Controller helpers. */

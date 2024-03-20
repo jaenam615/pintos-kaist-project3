@@ -12,6 +12,13 @@ static long long page_fault_cnt;
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 
+/* 
+ * 사용자 프로세스가 권한이 있거나 금지된 작업을 수행할 때 다음과 같이 커널에 트랩됩니다. 
+ * exception 또는 fault. 이 파일들은 예외를 처리합니다. 
+ * 현재 모든 예외는 메시지를 인쇄하고 프로세스를 종료하기만 하면 됩니다. 
+ * 전부는 아니지만 일부 프로젝트 2의 솔루션은  page_fault() 이 파일에서 수정이 필요합니다.
+ */
+
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -148,7 +155,11 @@ page_fault (struct intr_frame *f) {
 
 	/* Count page faults. */
 	page_fault_cnt++;
-
+	if (user)
+	{
+		f->R.rdi = -1;
+		exit(f->R.rdi);
+	}
 	/* If the fault is true fault, show info and exit. */
 	printf ("Page fault at %p: %s error %s page in %s context.\n",
 			fault_addr,

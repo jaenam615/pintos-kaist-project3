@@ -69,9 +69,9 @@ int
 main (void) {
 	uint64_t mem_end;
 	char **argv;
-
 	/* Clear BSS and get machine's RAM size. */
 	bss_init ();
+	
 
 	/* Break command line into arguments and parse options. */
 	argv = read_command_line ();
@@ -91,7 +91,6 @@ main (void) {
 	tss_init ();
 	gdt_init ();
 #endif
-
 	/* Initialize interrupt handlers. */
 	intr_init ();
 	timer_init ();
@@ -117,7 +116,6 @@ main (void) {
 #endif
 
 	printf ("Boot complete.\n");
-
 	/* Run actions specified on kernel command line. */
 	run_actions (argv);
 
@@ -190,11 +188,12 @@ read_command_line (void) {
 
 	/* Print kernel command line. */
 	printf ("Kernel command line:");
-	for (i = 0; i < argc; i++)
+	for (i = 0; i < argc; i++){
 		if (strchr (argv[i], ' ') == NULL)
 			printf (" %s", argv[i]);
 		else
 			printf (" '%s'", argv[i]);
+	}
 	printf ("\n");
 
 	return argv;
@@ -239,7 +238,7 @@ static void
 run_task (char **argv) {
 	const char *task = argv[1];
 
-	printf ("Executing '%s':\n", task);
+	printf("Executing '%s':\n", task);
 #ifdef USERPROG
 	if (thread_tests){
 		run_test (task);
@@ -262,7 +261,6 @@ run_actions (char **argv) {
 		int argc;                         /* # of args, including action name. */
 		void (*function) (char **argv);   /* Function to execute action. */
 	};
-
 	/* Table of supported actions. */
 	static const struct action actions[] = {
 		{"run", 2, run_task},

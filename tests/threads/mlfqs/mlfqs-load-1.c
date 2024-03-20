@@ -2,9 +2,13 @@
    0.5 in 38 to 45 seconds.  The expected time is 42 seconds, as
    you can verify:
    perl -e '$i++,$a=(59*$a+1)/60while$a<=.5;print "$i\n"'
+// 사용 중인 스레드 하나가 로드 평균을 높이는지 확인 예상시간은 42초이다.
 
    Then, verifies that 10 seconds of inactivity drop the load
-   average back below 0.5 again. */
+   average back below 0.5 again. 
+// 그런 다음 10초 동안 비활성화하면 부하 평균이 다시 0.5 미만으로 떨어지는지 확인합니다
+   */
+
 
 #include <stdio.h>
 #include "tests/threads/tests.h"

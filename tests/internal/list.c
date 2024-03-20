@@ -135,6 +135,7 @@ value_less (const struct list_elem *a_, const struct list_elem *b_,
   return a->value < b->value;
 }
 
+
 /* Verifies that LIST contains the values 0...SIZE when traversed
    in forward order. */
 static void
