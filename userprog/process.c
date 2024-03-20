@@ -34,12 +34,12 @@ static void initd (void *f_name);
 void argument_stack(char** argv, int argc, struct intr_frame *if_);
 struct thread *get_thread_from_tid(tid_t thread_id);
 
-struct fork_data
+struct parent_info
 {
 	struct thread *parent;
-	struct intr_frame *user_level_f;
+	struct intr_frame *parent_f;
 };
-static void __do_fork (struct fork_data *aux);
+static void __do_fork (struct parent_info *aux);
 // //구현
 // static char parse_options (char **argv);
 
@@ -63,6 +63,40 @@ process_init (void) {
  * 스레드 ID 또는 스레드를 만들 수 없는 경우 TID_ERROR.
  * 한 번 호출해야 합니다
  * */
+
+void argument_stack (char **argv, int argc, struct intr_frame *if_){
+	
+	int minus_addr;
+	int address = if_->rsp;
+	for (int i = argc-1; i >= 0;i-- ){
+		minus_addr = strlen(argv[i]) + 1; //if onearg, value = 7 
+		address -= minus_addr;
+		memcpy(address, argv[i], minus_addr);
+		argv[i] = (char *)address;
+	}
+
+	if (address % 8){
+		int word_align = address % 8;
+		address -= word_align;
+		memset(address, 0, word_align);
+	}
+
+	address -= 8;
+	memset(address, 0, sizeof(char*));
+
+	// address -= 8*argc;
+	// memcpy(address, &argv, 8*argc);
+
+	address -= (sizeof(char*) * argc);
+	memcpy(address, argv, sizeof(char*) * argc);
+
+
+	address -= 8;
+	memset(address, 0, 8);
+	if_->rsp = address;
+}
+
+
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
@@ -112,13 +146,12 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
-	// thread_current()->tf = if_;
-	struct fork_data my_data;
+	struct parent_info my_data;
 	my_data.parent = thread_current();
-	my_data.user_level_f = if_;
+	my_data.parent_f = if_;
 
 	struct thread *cur = thread_current();
-	memcpy(&cur->parent_tf, if_, sizeof(struct intr_frame));
+	memcpy(&cur->parent_tf, my_data.parent_f , sizeof(struct intr_frame));
 
 	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, &my_data);
 	if (tid == TID_ERROR){
@@ -127,7 +160,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 
 	struct thread *child = get_thread_from_tid(tid);
 	sema_down(&child->process_sema);
-	if(child->exit_status == -2)
+	if(child->exit_status == TID_ERROR)
 	{
 		sema_up(&child->exit_sema);
 		
@@ -135,7 +168,6 @@ process_fork (const char *name, struct intr_frame *if_) {
 	}
 
 	return tid;
-	// return thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
 }
 
 #ifndef VM
@@ -199,18 +231,16 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  * 힌트) parent->tf는 프로세스의 사용자 및 컨텍스트를 유지하지 않습니다.
  * 즉, process_fork의 두 번째 인수를 이 함수에 전달해야 합니다.
  */
-
-
 static void
-__do_fork (struct fork_data *aux) {
+__do_fork (struct parent_info *aux) {
 	struct intr_frame if_;
 	struct thread *parent = aux->parent;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) 
 	 * 어떻게든 parent_if를 전달해라.
 	 */
-	
-	struct intr_frame *parent_if = &parent->parent_tf;
+	struct intr_frame *parent_if = aux->parent_f;
+
 	bool succ = true;
 
     /* 1. Read the cpu context to local stack. */
@@ -237,7 +267,7 @@ __do_fork (struct fork_data *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
-process_exit
+
 	struct list_elem* e = list_begin(&parent->fd_table);
 	struct list *parent_list = &parent->fd_table;
 	if(!list_empty(parent_list)){
@@ -302,15 +332,12 @@ process_exec (void *f_name) {
 	success = load (file_name, &_if);
 	lock_release(&filesys_lock);
 
-	/* If load failed, quit. */
-	
-	if (!success)
-	{
-		palloc_free_page (file_name);
-		return -1;
-	}
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
+	/* If load failed, quit. */
 	palloc_free_page (file_name);
+	if (!success)
+		return -1;
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -328,15 +355,10 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-
-	// for (uint64_t i; i < 40000000000; i++){
-
-	// }
-	// return -1;
 	struct thread *t = get_thread_from_tid(child_tid);
 	if (t == NULL) {
 		return -1;
@@ -368,14 +390,17 @@ process_exit (void) {
 	}
 
 	struct list *exit_list = &t->fd_table;
-	for(int i = 2; i< t->last_created_fd; ++i)
+	struct list_elem *e = list_begin(&exit_list);
+	for(int i = 2; i< t->last_created_fd; ++i){
 		close(i);
-
+		free(find_file_descriptor(i)->file);
+	}
 
 	file_close(t->running);
 	process_cleanup();
 	sema_up(&t->wait_sema);
 	sema_down(&t->exit_sema);
+
 }
 
 /* Free the current process's resources. */
@@ -505,33 +530,23 @@ load (const char *file_name, struct intr_frame *if_) {
 	struct file *file = NULL;
 	off_t file_ofs;
 	bool success = false;
-	
 	int i, j;
 
-	char *next_ptr;
-	char *process_name;
-	char *token;
-	uintptr_t stack_ptr;
-	char *argv[LOADER_ARGS_LEN / 2 + 1];
-	char *token_argv[LOADER_ARGS_LEN / 2 + 1];
+	//스택에 전달받은 인자를 쌓아주는 작업
+	char *stk[64];
 	int argc = 0;
+	char *token, *save_ptr;
+
+   	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+		stk[argc] = token;
+		argc++;
+	}
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
-
-	process_name = strtok_r(file_name, " ", &next_ptr);
-	token_argv[argc] = process_name;
-
-	while (token != NULL)
-	{
-		// 인자(token) 분리해주는 과정 & argc 구하기
-		argc++;
-		token = strtok_r(NULL, " ", &next_ptr);
-		token_argv[argc] = token;
-	}
 
 	/* Open executable file. */
 	file = filesys_open (file_name);
@@ -600,7 +615,9 @@ load (const char *file_name, struct intr_frame *if_) {
                 break;
         }
 	}
+
 	t->running = file; 
+
 	file_deny_write(file);
 	/* Set up stack. */
 	if (!setup_stack (if_))
@@ -608,43 +625,13 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-	stack_ptr = if_->rsp;
 
 	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	for (i = argc - 1; i > -1; i--)
-		{
-			stack_ptr -= (strlen(token_argv[i]) + 1);
-			memcpy(stack_ptr, token_argv[i], strlen(token_argv[i]) + 1);
-			argv[i] = stack_ptr;
-		}
+	//  * TODO: Implement argument passing (see project2/argument_passing.html). */
+	argument_stack(stk, argc, if_);
+	if_->R.rsi = if_->rsp + 8;
+	if_->R.rdi = argc;	
 
-		// word-align - 8의 배수로 맞춘다(padding)
-		// x86-64의 stack alignmet 규칙에 따르면 return address를 제외하고 직전까지의 상황에서 %rsprk 16
-		if ((if_->rsp - stack_ptr) % 8)
-		{
-			int p_size = (8 - ((if_->rsp - stack_ptr) % 8));
-			stack_ptr -= (8 - ((if_->rsp - stack_ptr) % 8));
-			memset(stack_ptr, 0, p_size);
-		}
-
-		// argv의 마지막을 null로 한다 -> 인자을 끝을 알린다.
-		stack_ptr -= 8;
-		memset(stack_ptr, 0, 8);
-
-		// 인자를 저장한 주소를 스택에 저장한다.
-		stack_ptr -= (argc * (sizeof(argv[0]) / sizeof(char)));
-		memcpy(stack_ptr, argv, argc * (sizeof(argv[0]) / sizeof(char)));
-
-		// Push Fake Return Address
-		stack_ptr -= 8;
-		memset(stack_ptr, 0, 8);
-
-		if_->rsp = stack_ptr;
-
-		// rsi가 argv의 주소(argv[0]의 주소를 가리키게 하고, rdi를 argc로 설정합니다.
-		if_->R.rsi = stack_ptr + 8;
-		if_->R.rdi = argc;
 	success = true;
 
 done:
@@ -874,70 +861,6 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 #endif /* VM */
-
-
-void argument_stack (char **argv, int argc, struct intr_frame *if_){
-	
-	// int minus_addr;
-	// int address = if_->rsp;
-	// for (int i = argc-1; i >= 0;i-- ){
-	// 	minus_addr = strlen(argv[i]) + 1; //if onearg, value = 7 
-	// 	address -= minus_addr;
-	// 	memcpy(address, argv[i], minus_addr);
-	// 	argv[i] = (char *)address;
-	// }
-
-	// if (address % 8){
-	// 	int word_align = address % 8;
-	// 	address -= word_align;
-	// 	memset(address, 0, word_align);
-	// }
-
-	// address -= 8;
-	// memset(address, 0, sizeof(char*));
-
-	// for (int i = argc; i>=0; i-- ){
-	// 	address -= 8;
-	// 	memcpy(address, &argv[i], 8);
-	// }
-
-	// address -= 8;
-	// memset(address, 0, 8);
-	// if_->rsp = address;
-
-	char *addrs[64];
-	int size;
-
-	// 2. 단어를 스택의 맨위에 넣는다.
-	for (int i = argc - 1; i >= 0; i--)
-	{
-		size = strlen(argv[i]) + 1;
-		if_->rsp -= size;
-		memcpy(if_->rsp, argv[i], size);
-		addrs[i] = if_->rsp;
-	}
-
-	// 3. 스택을 8바이트로 정렬한다.
-	while (if_->rsp % 8 != 0) {
-		if_->rsp--;
-		memset(if_->rsp, 0, sizeof(char));
-	}
-
-	// 4. 널 포인터 센티널을 넣는다.
-	if_->rsp -= 8;
-	memset(if_->rsp, 0, sizeof(char **));
-
-	// 5. 스택에 주소를 넣는다.
-	for (int i = argc - 1; i >= 0; i--)
-	{
-		if_->rsp -= 8;
-		memcpy(if_->rsp, &addrs[i], sizeof(char **));
-	}
-
-	// 6. 가짜 반환 주소를 넣는다.
-	if_->rsp -= 8;
-	memset(if_->rsp, 0, sizeof(void *));
-}
 
 struct thread *get_thread_from_tid(tid_t thread_id){
 

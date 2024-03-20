@@ -130,7 +130,7 @@ struct thread {
 	struct list_elem child_list_elem;
 
 	struct thread *parent;
-	struct semaphore process_sema;
+
 
 	int exit_status; 
 
@@ -139,7 +139,8 @@ struct thread {
 	int fd_idx;
 
 	struct file *running;
-
+	/* 자식 프로세스의 fork가 완료될 때까지 기다리도록 하기 위한 세마포어 */
+	struct semaphore process_sema;
 	struct semaphore wait_sema;
 	struct semaphore exit_sema;
 };

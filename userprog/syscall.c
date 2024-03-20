@@ -7,6 +7,7 @@
 #include "threads/init.h"
 #include "userprog/gdt.h"
 #include "userprog/process.h"
+// #include "lib/user/syscall.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -34,9 +35,8 @@ unsigned tell (int fd);
 void close (int fd);
 
 int insert_file_fdt(struct file *file);
-static struct file *find_file_by_fd(int fd);
 int process_add_file(struct file *f); 
-
+struct file_descriptor *find_file_descriptor(int fd);
 /* System call.
  *
  * 사용자 프로세스가 커널 기능에 액세스하기를 원할 때마다 시스템 호출을 호출합니다. 
@@ -109,6 +109,9 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
+
+	struct thread *t = thread_current();
+	t->tf = *f;
 
 	// int size = palloc_init();
 	
@@ -212,9 +215,7 @@ void exit(int status)
 }
 
 tid_t fork (const char *thread_name, struct intr_frame *f){
-tid_t fork (const char *thread_name, struct intr_frame *f){
 	
-	return process_fork(thread_name, f);
 	return process_fork(thread_name, f);
 }
 
@@ -246,7 +247,7 @@ int wait (tid_t t)
 //메인 쓰레드의 fd_table 리스트에 할당
 bool create (const char *file, unsigned initial_size) 
 {
-		//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
+	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
 		exit(-1);
 	
@@ -263,13 +264,15 @@ bool remove (const char *file)
 	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
 		exit(-1);
+	lock_acquire(&filesys_lock);
+	bool success =  filesys_remove(file);
+	lock_release(&filesys_lock);
 
-	return filesys_remove(file);
+	return success;
 }
 
 //file이라는 파일을 연다
 //fd반환
-
 int open (const char *file) 
 {
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
@@ -281,7 +284,6 @@ int open (const char *file)
 		lock_release(&filesys_lock);
 		return fd;
 	}
-	// fd = allocate_fd(open_file, &thread_current()->fd_table);
 	fd = process_add_file(open_file);
 	if (fd == -1)
 		file_close(open_file);
@@ -289,44 +291,7 @@ int open (const char *file)
 	return fd;
 }
 
-// int open (const char *file) 
-// {
-// 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
-// 		exit(-1);
-
-// 	// struct file *opened_file = filesys_open(file);
-// 	// if (opened_file == NULL){
-// 	// 	return -1;
-// 	// }
-	
-// 	// int fd = allocate_fd(opened_file, &thread_current()->fd_table);
-
-// 	// return fd;
-
-// 	// check_address(file);
-// 	if (thread_current()->last_created_fd > 20)
-// 	{
-// 		return -1;
-// 	}
-// 	if (*file == NULL)
-// 		return -1;
-
-// 	struct file *open_file = filesys_open(file);
-// 	if (open_file == NULL)
-// 		return -1;
-// 	int fd = process_add_file(open_file);
-
-// 	return fd;
-
-// }
-
 void close (int fd) {
-	// struct file_descriptor *file_desc = find_file_descriptor(fd);
-	// if(file_desc == NULL)
-	// 	return;
-	// file_close(file_desc->file);
-	// list_remove(&file_desc->fd_elem);
-	// free(file_desc);
 
 	struct thread *curr = thread_current();
 	struct list_elem *start;
@@ -337,13 +302,11 @@ void close (int fd) {
 		{
 			file_close(close_fd->file);
 			list_remove(&close_fd->fd_elem);
-			// close_fd->fd = NULL;
-			// free(close_fd);
 		}
 	}
 	return;
-
 }
+
 int filesize (int fd)
 {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
@@ -356,76 +319,90 @@ int read (int fd, void *buffer, unsigned size)
 {
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
 		exit(-1);
-	int byte = 0;
-	char* _buffer = buffer;
-	lock_acquire(&filesys_lock);
-	if(fd == 0)
+
+	struct thread *curr = thread_current();
+	struct list_elem *start;
+	off_t buff_size;
+
+	if (fd == 0)
 	{
-		while(byte < size)
-		{
-			_buffer[byte++] = input_getc();
-		}
-		lock_release(&filesys_lock);
+		return input_getc();
 	}
-	else if(fd == 1)
+	else if (fd < 0 || fd == NULL || fd == 1)
 	{
-		return -1;
+		exit(-1);
 	}
+	// bad-fd는 page-fault를 일으키기 때문에 page-fault를 처리하는 함수에서 확인
 	else
 	{
-		struct file_descriptor *file_desc = find_file_descriptor(fd);
-		if(file_desc == NULL)
+		for (start = list_begin(&curr->fd_table); start != list_end(&curr->fd_table); start = list_next(start))
 		{
-			lock_release(&filesys_lock);
-			return -1;
+			struct file_descriptor *read_fd = list_entry(start, struct file_descriptor, fd_elem);
+			if (read_fd->fd == fd)
+			{
+				lock_acquire(&filesys_lock);
+				buff_size = file_read(read_fd->file, buffer, size);
+				lock_release(&filesys_lock);
+			}
 		}
-		byte = file_read(file_desc->file,buffer,size);
-		lock_release(&filesys_lock);
 	}
 	return buff_size;
-
 }
 
 int write (int fd, const void *buffer, unsigned size)
 {
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
 		exit(-1);
-	char* _buffer = buffer;
-	if(fd == 0)
+
+	struct thread *curr = thread_current();
+	struct list_elem *start;
+	if (fd == 1)
 	{
-		return -1;
-	}
-	else if(fd == 1)
-	{
-		putbuf(_buffer,size);
+		putbuf(buffer, size);
 		return size;
+		// fd == 1이라는 의미는 표준 출력을 의미함. 따라서 화면에 입력된 데이터를 출력하는 함수 pufbuf를 호출.
+		// putbuf 함수는 buffer에 입력된 데이터를 size만큼 화면에 출력하는 함수.
+		// 이후 버퍼의 크기 -> size를 반환한다.
 	}
-	else
+	else if (fd < 0 || fd == NULL)
 	{
-		struct file_descriptor *file_desc = find_file_descriptor(fd);
-		if(file_desc == NULL)
-			return -1;
-		lock_acquire(&filesys_lock);
-		file_write(file_desc->file,_buffer,size);
-		lock_release(&filesys_lock);
-		return size;
+		exit(-1);
+	}
+	for (start = list_begin(&curr->fd_table); start != list_end(&curr->fd_table); start = list_next(start))
+	{
+		struct file_descriptor *write_fd = list_entry(start, struct file_descriptor, fd_elem);
+		if (write_fd->fd == fd)
+		{
+			lock_acquire(&filesys_lock);
+			off_t write_size = file_write(write_fd->file, buffer, size);
+			// fd == 0 과 fd == 1은 표준 입출력을 의미하는 파일 식별자이기 때문에 해당되는 파일이 존재하지 않는다.
+			// 따라서 정상적인 write가 이루어지지 않는다. fd == 1이면 write 함수의 반환값은 0임.
+			lock_release(&filesys_lock);
+			return write_size;
+		}
 	}
 }
 
 void seek (int fd, unsigned position)
 {
-	struct file_descriptor *file_desc = find_file_descriptor(fd);
-	if(file_desc == NULL)
-		return;
-	file_seek(file_desc->file, position);
+
+	struct thread *curr = thread_current();
+	struct list_elem *start;
+
+	for (start = list_begin(&curr->fd_table); start != list_end(&curr->fd_table); start = list_next(start))
+	{
+		struct file_descriptor *seek_fd = list_entry(start, struct file_descriptor, fd_elem);
+		if (seek_fd->fd == fd)
+		{
+			return file_seek(seek_fd->file, position);
+		}
+	}
+
+
 }
 
 unsigned tell (int fd)
 {
-	// struct file_descriptor *file_desc = find_file_descriptor(fd);
-	// if(file_desc == NULL)
-	// 	return -1;
-	// return file_tell(&file_desc->file);
 
 	struct thread *curr = thread_current();
 	struct list_elem *start;
@@ -441,3 +418,16 @@ unsigned tell (int fd)
 
 }
 
+int process_add_file(struct file *f)
+{
+	struct thread *curr = thread_current();
+	struct file_descriptor *new_fd = malloc(sizeof(struct file_descriptor));
+
+	// curr에 있는 fd_table의 fd를 확인하기 위한 작업
+	curr->last_created_fd += 1;
+	new_fd->fd = curr->last_created_fd;
+	new_fd->file = f;
+	list_push_back(&curr->fd_table, &new_fd->fd_elem);
+
+	return new_fd->fd;
+}
