@@ -42,8 +42,6 @@ struct thread *get_thread_from_tid(tid_t thread_id);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
-	// thread_init();
-	// list_insert_ordered(&all_list, &current->all_elem, priority_scheduling, NULL);
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -118,8 +116,11 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	}
 
 	struct thread *child = get_thread_from_tid(tid);
-
 	sema_down(&child->process_sema);
+	if(child->exit_status == TID_ERROR)
+	{
+		return TID_ERROR;
+	}
 
 	return tid;
 	// return thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
@@ -152,7 +153,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER|PAL_ZERO);
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
 	if (newpage == NULL){
 		return false;
 	}
@@ -161,11 +162,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
 	memcpy(newpage, parent_page, PGSIZE);
-	if (is_writable(pte)){
-		writable = true;
-	} else {
-		writable = false;
-	}
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. 
@@ -199,7 +196,7 @@ __do_fork (void *aux) {
 	 * 어떻게든 parent_if를 전달해라.
 	 */
 	
-	struct intr_frame *parent_if = &parent->tf;
+	struct intr_frame *parent_if = &parent->parent_tf;
 
 	bool succ = true;
 
@@ -320,7 +317,7 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid) {
+process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -354,20 +351,14 @@ process_exit (void) {
 
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
-	while (!list_empty(exit_list)){
-		struct file_descriptor *exit_fd = list_entry(e, struct file_descriptor, fd_elem);
-		file_close(exit_fd->file);
-		e = list_remove(&exit_fd->fd_elem);
-		free(exit_fd);
-	}
-
+	for(int i = 2; i< t->last_created_fd; ++i)
+		close(i);
 	// int fd = 2; 
 	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
 	// 	fd ++;
 	// 	close (fd);	
 	// }
 	file_close(t->running);
-	t->exit_status = THREAD_DYING;
 	process_cleanup();
 	sema_up(&t->wait_sema);
 	sema_down(&t->exit_sema);

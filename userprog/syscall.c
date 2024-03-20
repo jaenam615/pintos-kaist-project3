@@ -102,7 +102,7 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
-	
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -239,7 +239,6 @@ int exec (const char *file){
 //자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
 int wait (tid_t t)
 {		
-
 	return process_wait(t); 
 }
 
