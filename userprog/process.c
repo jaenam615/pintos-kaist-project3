@@ -42,8 +42,6 @@ struct thread *get_thread_from_tid(tid_t thread_id);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
-	// thread_init();
-	// list_insert_ordered(&all_list, &current->all_elem, priority_scheduling, NULL);
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -106,7 +104,7 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_) {
+process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	// thread_current()->tf = if_;
 	struct thread *cur = thread_current();
@@ -118,8 +116,11 @@ process_fork (const char *name, struct intr_frame *if_) {
 	}
 
 	struct thread *child = get_thread_from_tid(tid);
-
 	sema_down(&child->process_sema);
+	if(child->exit_status == TID_ERROR)
+	{
+		return TID_ERROR;
+	}
 
 	return tid;
 	// return thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
@@ -152,7 +153,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER|PAL_ZERO);
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
 	if (newpage == NULL){
 		return false;
 	}
@@ -161,17 +162,18 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
 	memcpy(newpage, parent_page, PGSIZE);
-	if (is_writable(pte)){
-		writable = true;
-	} else {
-		writable = false;
-	}
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
-	 *    permission. */
+	 *    permission. 
+	 * 5. 쓰기 가능한 권한으로 주소 VA의 어린이 페이지 테이블에 새 페이지를 추가합니다.
+	 */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
-		/* 6. TODO: if fail to insert page, do error handling. */
+		/* 6. TODO: if fail to insert page, do error handling. 
+		 * 6. 작업: 페이지를 삽입하지 못할 경우 오류 처리를 수행합니다.
+		 */
 		return false;
+
 	}
 	return true;
 }
@@ -186,14 +188,17 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  * 즉, process_fork의 두 번째 인수를 이 함수에 전달해야 합니다.
  */
 static void
-__do_fork(void *aux)
-{
-    struct intr_frame if_;
-    struct thread *parent = (struct thread *)aux;
-    struct thread *current = thread_current();
-    /* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-    struct intr_frame *parent_if = &parent->parent_tf;
-    bool succ = true;
+__do_fork (void *aux) {
+	struct intr_frame if_;
+	struct thread *parent = (struct thread *) aux;
+	struct thread *current = thread_current ();
+	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) 
+	 * 어떻게든 parent_if를 전달해라.
+	 */
+	
+	struct intr_frame *parent_if = &parent->parent_tf;
+
+	bool succ = true;
 
     /* 1. Read the cpu context to local stack. */
     memcpy(&if_, parent_if, sizeof(struct intr_frame));
@@ -312,7 +317,7 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid) {
+process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -346,20 +351,14 @@ process_exit (void) {
 
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
-	while (!list_empty(exit_list)){
-		struct file_descriptor *exit_fd = list_entry(e, struct file_descriptor, fd_elem);
-		file_close(exit_fd->file);
-		e = list_remove(&exit_fd->fd_elem);
-		free(exit_fd);
-	}
-
+	for(int i = 2; i< t->last_created_fd; ++i)
+		close(i);
 	// int fd = 2; 
 	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
 	// 	fd ++;
 	// 	close (fd);	
 	// }
 	file_close(t->running);
-	t->exit_status = THREAD_DYING;
 	process_cleanup();
 	sema_up(&t->wait_sema);
 	sema_down(&t->exit_sema);
@@ -842,9 +841,11 @@ void argument_stack (char **argv, int argc, struct intr_frame *if_){
 struct thread *get_thread_from_tid(tid_t thread_id){
 
 	struct thread * t = thread_current();
-	struct list_elem* e = list_front(&t->child_list);
+	struct list* child_list = &t->child_list;
+	struct list_elem* e;
 
-	for (e = list_begin (&t->child_list); e != list_end (&t->child_list); e = list_next (e)){
+	for (e = list_begin (child_list); e != list_end (child_list); e = list_next (e))
+	{
 		t = list_entry(e, struct thread, child_list_elem);
 		if (t->tid == thread_id){
 			return t;
