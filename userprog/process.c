@@ -34,12 +34,12 @@ static void initd (void *f_name);
 void argument_stack(char** argv, int argc, struct intr_frame *if_);
 struct thread *get_thread_from_tid(tid_t thread_id);
 
-struct fork_data
+struct parent_info
 {
 	struct thread *parent;
-	struct intr_frame *user_level_f;
+	struct intr_frame *parent_f;
 };
-static void __do_fork (struct fork_data *aux);
+static void __do_fork (struct parent_info *aux);
 // //구현
 // static char parse_options (char **argv);
 
@@ -146,13 +146,12 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
-	// thread_current()->tf = if_;
-	struct fork_data my_data;
+	struct parent_info my_data;
 	my_data.parent = thread_current();
-	my_data.user_level_f = if_;
+	my_data.parent_f = if_;
 
 	struct thread *cur = thread_current();
-	memcpy(&cur->parent_tf, if_, sizeof(struct intr_frame));
+	memcpy(&cur->parent_tf, my_data.parent_f , sizeof(struct intr_frame));
 
 	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, &my_data);
 	if (tid == TID_ERROR){
@@ -169,7 +168,6 @@ process_fork (const char *name, struct intr_frame *if_) {
 	}
 
 	return tid;
-	// return thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
 }
 
 #ifndef VM
@@ -234,15 +232,14 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  * 즉, process_fork의 두 번째 인수를 이 함수에 전달해야 합니다.
  */
 static void
-__do_fork (struct fork_data *aux) {
+__do_fork (struct parent_info *aux) {
 	struct intr_frame if_;
 	struct thread *parent = aux->parent;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) 
 	 * 어떻게든 parent_if를 전달해라.
 	 */
-	
-	struct intr_frame *parent_if = aux->user_level_f;
+	struct intr_frame *parent_if = aux->parent_f;
 
 	bool succ = true;
 
@@ -270,17 +267,6 @@ __do_fork (struct fork_data *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
-	// struct list_elem* e = list_begin(&parent->fd_table);
-	// 	for(int i = 0; i< list_size(&parent->fd_table); ++i)
-	// 	{
-	// 		struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
-	// 		struct file_descriptor* tmp_file_desc;
-	// 		tmp_file_desc->fd = file_desc->fd;
-	// 		tmp_file_desc->file = file_duplicate(file_desc->file);
-	// 		list_push_back(&tmp_file_desc->fd_elem,&current->fd_table);
-			
-	// 	}
-	// current->last_created_fd = parent->last_created_fd;
 
 	struct list_elem* e = list_begin(&parent->fd_table);
 	struct list *parent_list = &parent->fd_table;
@@ -410,9 +396,10 @@ process_exit (void) {
 
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
-	for(int i = 2; i< t->last_created_fd; ++i)
+	for(int i = 2; i< t->last_created_fd; ++i){
 		close(i);
-
+		free(find_file_descriptor(i)->file);
+	}
 
 	file_close(t->running);
 	process_cleanup();
