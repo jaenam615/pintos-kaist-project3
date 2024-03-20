@@ -355,15 +355,10 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-
-	// for (uint64_t i; i < 40000000000; i++){
-
-	// }
-	// return -1;
 	struct thread *t = get_thread_from_tid(child_tid);
 	if (t == NULL) {
 		return -1;

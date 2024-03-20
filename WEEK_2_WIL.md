@@ -595,6 +595,39 @@ struct thread{
 자식 프로세스 t를 기다리며 자식 프로세스의 `exit_status`를 반환한다. 
 이를 위해 thread 구조체에 `exit_status`를 추가해주었다.  
 
+`process_wait`에서 우선 자식의 tid를 구한 후, 구조체에 넣어둔 wait_sema를 `sema_down`하여 블락을 시킨다. 
 
+```c
+int
+process_wait (tid_t child_tid) {
+	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
+	 * XXX:       to add infinite loop here before
+	 * XXX:       implementing the process_wait. */
+	struct thread *t = get_thread_from_tid(child_tid);
+	if (t == NULL) {
+		return -1;
+	}
 
+	sema_down(&t->wait_sema);
+.
+.
+```
+이렇게 되면, 자식 프로세스가 진행되며 자식 프로세스에서 `process_exit`이 언젠간 호출된다 (강제 종료 시점 또는 프로세스의 마무리 시점).
+`process_exit`에는 `sema_up(&t->wait_sema)`가 있어 이를 통해 다시 부모 프로세스가 호출한 `process_wait`으로 돌아오게 된다. 
 
+```c
+void process_exit(void){
+.
+.
+	file_close(t->running);
+	process_cleanup();
+	sema_up(&t->wait_sema);
+	sema_down(&t->exit_sema);
+}
+```
+이후, 부모 프로세스는 자식 프로세스를 자식 프로세스 리스트에서 제거하고 위 `process_exit`에서 호출된 `sema_down(&t->exit_sema)`를 다시 올려주는 `sema_up(&t->exit_sema)`
+
+이후, `exit_status`를 반환한다. 
+
+<hr>
+<hr>
