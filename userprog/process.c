@@ -30,10 +30,16 @@
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
-static void __do_fork (void *);
+
 void argument_stack(char** argv, int argc, struct intr_frame *if_);
 struct thread *get_thread_from_tid(tid_t thread_id);
 
+struct fork_data
+{
+	struct thread *parent;
+	struct intr_frame *user_level_f;
+};
+static void __do_fork (struct fork_data *aux);
 // //구현
 // static char parse_options (char **argv);
 
@@ -104,14 +110,18 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
 	// thread_current()->tf = if_;
+	struct fork_data my_data;
+	my_data.parent = thread_current();
+	my_data.user_level_f = if_;
+
 	struct thread *cur = thread_current();
 	memcpy(&cur->parent_tf, if_, sizeof(struct intr_frame));
 
-	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, cur);
-	if (tid = TID_ERROR){
+	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, &my_data);
+	if (tid == TID_ERROR){
 		return TID_ERROR;
 	}
 
@@ -119,6 +129,8 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_down(&child->process_sema);
 	if(child->exit_status == TID_ERROR)
 	{
+		sema_up(&child->exit_sema);
+		
 		return TID_ERROR;
 	}
 
@@ -153,7 +165,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
+	newpage = palloc_get_page(PAL_USER);
 	if (newpage == NULL){
 		return false;
 	}
@@ -188,15 +200,15 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  * 즉, process_fork의 두 번째 인수를 이 함수에 전달해야 합니다.
  */
 static void
-__do_fork (void *aux) {
+__do_fork (struct fork_data *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	struct thread *parent = aux->parent;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) 
 	 * 어떻게든 parent_if를 전달해라.
 	 */
 	
-	struct intr_frame *parent_if = &parent->parent_tf;
+	struct intr_frame *parent_if = aux->user_level_f;
 
 	bool succ = true;
 
@@ -264,7 +276,7 @@ __do_fork (void *aux) {
     if (succ)
         do_iret(&if_);
 error:
-    sema_up(&current->process_sema);
+    // sema_up(&current->process_sema);
     exit(TID_ERROR);
 }
 
@@ -376,16 +388,12 @@ process_exit (void) {
 		t->running = NULL;
 	}
 
-
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
 	for(int i = 2; i< t->last_created_fd; ++i)
 		close(i);
-	// int fd = 2; 
-	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
-	// 	fd ++;
-	// 	close (fd);	
-	// }
+
+
 	file_close(t->running);
 	process_cleanup();
 	sema_up(&t->wait_sema);
