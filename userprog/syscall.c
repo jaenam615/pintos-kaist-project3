@@ -7,7 +7,6 @@
 #include "threads/init.h"
 #include "userprog/gdt.h"
 #include "userprog/process.h"
-#include "lib/user/syscall.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -16,13 +15,12 @@
 #include "lib/string.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void halt (void);
 void exit (int status);
-tid_t fork (const char *thread_name);
+tid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (const char *file);
 int wait (tid_t);
 bool create (const char *file, unsigned initial_size);
@@ -110,9 +108,6 @@ void
 syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 
-	struct thread *t = thread_current();
-	t->tf = *f;
-
 	// int size = palloc_init();
 	
 	//주소가 유호한지 확인
@@ -144,7 +139,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 	
 	case SYS_FORK:
-		f->R.rax = fork(f->R.rdi);
+		f->R.rax = fork(f->R.rdi,f);
 		break;
 
 	case SYS_EXEC:
@@ -214,9 +209,9 @@ void exit(int status)
 	thread_exit();
 }
 
-tid_t fork (const char *thread_name){
+tid_t fork (const char *thread_name, struct intr_frame *f){
 	
-	return process_fork(thread_name, &thread_current()->tf);
+	return process_fork(thread_name, f);
 }
 
 //현재 프로세스를 file로 바꿈
@@ -233,7 +228,7 @@ int exec (const char *file){
 	strlcpy(file_in_kernel, file, PGSIZE);
 	
 	if (process_exec(file_in_kernel) == -1)
-		return -1;
+		exit(-1);
 }
 
 //자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
@@ -247,11 +242,13 @@ int wait (tid_t t)
 //메인 쓰레드의 fd_table 리스트에 할당
 bool create (const char *file, unsigned initial_size) 
 {
-	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
+		//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
 		exit(-1);
-	
-	return filesys_create(file, initial_size);
+	lock_acquire(&filesys_lock);
+	bool success = filesys_create(file, initial_size);
+	lock_release(&filesys_lock);
+	return success;
 }
 
 //file이라는 파일을 삭제
@@ -271,16 +268,17 @@ int open (const char *file)
 {
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
-
-	struct file *opened_file = filesys_open(file);
+	lock_acquire(&filesys_lock);
+	struct file *open_file = filesys_open(file);
 	int fd = -1;
-	if (opened_file != NULL){
-	 	fd = allocate_fd(opened_file, &thread_current()->fd_table);
-		if (fd == -1){
-			file_close(opened_file);
-		}
-	} 
-
+	if(open_file == NULL){
+		lock_release(&filesys_lock);
+		return fd;
+	}
+	fd = allocate_fd(open_file, &thread_current()->fd_table);
+	if (fd == -1)
+		file_close(open_file);
+	lock_release(&filesys_lock);
 	return fd;
 }
 void close (int fd) {
@@ -306,12 +304,14 @@ int read (int fd, void *buffer, unsigned size)
 		exit(-1);
 	int byte = 0;
 	char* _buffer = buffer;
+	lock_acquire(&filesys_lock);
 	if(fd == 0)
 	{
 		while(byte < size)
 		{
 			_buffer[byte++] = input_getc();
 		}
+		lock_release(&filesys_lock);
 	}
 	else if(fd == 1)
 	{
@@ -321,8 +321,12 @@ int read (int fd, void *buffer, unsigned size)
 	{
 		struct file_descriptor *file_desc = find_file_descriptor(fd);
 		if(file_desc == NULL)
+		{
+			lock_release(&filesys_lock);
 			return -1;
+		}
 		byte = file_read(file_desc->file,buffer,size);
+		lock_release(&filesys_lock);
 	}
 	return byte;
 }
@@ -346,7 +350,9 @@ int write (int fd, const void *buffer, unsigned size)
 		struct file_descriptor *file_desc = find_file_descriptor(fd);
 		if(file_desc == NULL)
 			return -1;
+		lock_acquire(&filesys_lock);
 		file_write(file_desc->file,_buffer,size);
+		lock_release(&filesys_lock);
 		return size;
 	}
 }
@@ -355,7 +361,7 @@ void seek (int fd, unsigned position)
 {
 	struct file_descriptor *file_desc = find_file_descriptor(fd);
 	if(file_desc == NULL)
-		return -1;
+		return;
 	file_seek(file_desc->file, position);
 }
 
@@ -367,15 +373,3 @@ unsigned tell (int fd)
 	return file_tell(&file_desc->file);
 }
 
-// pid_t fork (const char *thread_name)
-// {
-
-// }
-// int exec (const char *file)
-// {
-
-// }
-// int wait (pid_t pid)
-// {
-
-// }

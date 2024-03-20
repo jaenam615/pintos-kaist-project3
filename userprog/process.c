@@ -117,8 +117,9 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	struct thread *child = get_thread_from_tid(tid);
 	sema_down(&child->process_sema);
-	if(child->exit_status == TID_ERROR)
+	if(child->exit_status == -2)
 	{
+		sema_up(&child->exit_sema);
 		return TID_ERROR;
 	}
 
@@ -187,6 +188,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  * 힌트) parent->tf는 프로세스의 사용자 및 컨텍스트를 유지하지 않습니다.
  * 즉, process_fork의 두 번째 인수를 이 함수에 전달해야 합니다.
  */
+
+
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
@@ -197,7 +200,6 @@ __do_fork (void *aux) {
 	 */
 	
 	struct intr_frame *parent_if = &parent->parent_tf;
-
 	bool succ = true;
 
     /* 1. Read the cpu context to local stack. */
@@ -224,6 +226,7 @@ __do_fork (void *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
+	lock_acquire(&filesys_lock);
 	struct list_elem* e = list_begin(&parent->fd_table);
 		for(int i = 0; i< list_size(&parent->fd_table); ++i)
 		{
@@ -235,6 +238,7 @@ __do_fork (void *aux) {
 			
 		}
 	current->last_created_fd = parent->last_created_fd;
+	lock_release(&filesys_lock);
 
     // 로드가 완료될 때까지 기다리고 있던 부모 대기 해제
     sema_up(&current->process_sema);
@@ -245,7 +249,7 @@ __do_fork (void *aux) {
         do_iret(&if_);
 error:
     sema_up(&current->process_sema);
-    exit(TID_ERROR);
+    exit(-2);
 }
 
 /* Switch the current execution context to the f_name.
@@ -285,21 +289,29 @@ process_exec (void *f_name) {
 	}
 
 	/* And then load the binary */
+	lock_acquire(&filesys_lock);
 	success = load (file_name, &_if);
-
-	argument_stack(stk, i, &_if);
-	// argument_stack(stk, i, &_if);
-	_if.R.rdi = i;
-	_if.R.rsi = (char*)_if.rsp + 8;
+	lock_release(&filesys_lock);
 
 
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	// argument_stack(argv, i, &_if);
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
+	
 	if (!success)
+	{
+		palloc_free_page (file_name);
 		return -1;
+	}
+
+	
+	argument_stack(stk, i, &_if);
+	// argument_stack(stk, i, &_if);
+	_if.R.rdi = i;
+	_if.R.rsi = (char*)_if.rsp + 8;
+
+	palloc_free_page (file_name);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -350,9 +362,9 @@ process_exit (void) {
 	struct thread *t = thread_current();
 
 	struct list *exit_list = &t->fd_table;
-	struct list_elem *e = list_begin(&exit_list);
 	for(int i = 2; i< t->last_created_fd; ++i)
 		close(i);
+	
 	// int fd = 2; 
 	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
 	// 	fd ++;
@@ -362,7 +374,6 @@ process_exit (void) {
 	process_cleanup();
 	sema_up(&t->wait_sema);
 	sema_down(&t->exit_sema);
-
 }
 
 /* Free the current process's resources. */
