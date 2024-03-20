@@ -104,7 +104,7 @@ initd (void *f_name) {
  * 스레드를 만들 수 없는 경우 TID_ERROR입니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_) {
+process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	// thread_current()->tf = if_;
 	struct thread *cur = thread_current();
@@ -153,7 +153,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER);
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
 	if (newpage == NULL){
 		return false;
 	}
@@ -224,6 +224,18 @@ __do_fork (void *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
+	// struct list_elem* e = list_begin(&parent->fd_table);
+	// 	for(int i = 0; i< list_size(&parent->fd_table); ++i)
+	// 	{
+	// 		struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
+	// 		struct file_descriptor* tmp_file_desc;
+	// 		tmp_file_desc->fd = file_desc->fd;
+	// 		tmp_file_desc->file = file_duplicate(file_desc->file);
+	// 		list_push_back(&tmp_file_desc->fd_elem,&current->fd_table);
+			
+	// 	}
+	// current->last_created_fd = parent->last_created_fd;
+
 	struct list_elem* e = list_begin(&parent->fd_table);
 	struct list *parent_list = &parent->fd_table;
 	if(!list_empty(parent_list)){
@@ -245,14 +257,14 @@ __do_fork (void *aux) {
 	if_.R.rax = 0;
 
     // 로드가 완료될 때까지 기다리고 있던 부모 대기 해제
-    process_init();
     sema_up(&current->process_sema);
+    process_init();
 
     /* Finally, switch to the newly created process. */
     if (succ)
         do_iret(&if_);
 error:
-    // sema_up(&current->process_sema);
+    sema_up(&current->process_sema);
     exit(TID_ERROR);
 }
 
@@ -325,7 +337,7 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid) {
+process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -357,26 +369,25 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *t = thread_current();
 
+
 	if (t->pml4 != NULL){
 		printf("%s: exit(%d)\n", t->name, t->exit_status);
 		file_close(t->running);
 		t->running = NULL;
 	}
 
+
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
-	while (!list_empty(exit_list)){
-		struct file_descriptor *exit_fd = list_entry(e, struct file_descriptor, fd_elem);
-		file_close(exit_fd->file);
-		e = list_remove(&exit_fd->fd_elem);
-		free(exit_fd);
-	}
-
-	// file_close(t->running);
-	// t->exit_status = THREAD_DYING;
+	for(int i = 2; i< t->last_created_fd; ++i)
+		close(i);
+	// int fd = 2; 
+	// for(struct list_elem *e = list_begin(&t->fd_table); e != NULL ; e = list_next(&t->fd_table)){
+	// 	fd ++;
+	// 	close (fd);	
+	// }
 	file_close(t->running);
 	process_cleanup();
-	sema_up(&t->process_sema);
 	sema_up(&t->wait_sema);
 	sema_down(&t->exit_sema);
 
