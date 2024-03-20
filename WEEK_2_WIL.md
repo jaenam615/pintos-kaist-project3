@@ -241,7 +241,17 @@ int process_add_file(struct file *f)
 }
 ```
 create랑 remove할때와 동시성 문제를 해결하기 위해 `filesys_open` 전후로 lock을 acquire및 release 해주었다.
-`process_add_file`함수는 `filesys_open`을 통해 열린 파일에 대해 파일 디스크립터를 부여하고 파일 디스크립터 테이블에 해당 파일을 넣어준다. 
+`process_add_file`함수는 `filesys_open`을 통해 열린 파일에 대해 파일 디스크립터를 부여하고 리스트로 구현된 파일 디스크립터 테이블에 해당 파일을 넣어준다. 
+
+모든 쓰레드는 파일 디스크립터 리스트를 보유한다. 
+
+```c
+struct thread{
+	uint64_t *pml4;                   
+	struct list fd_table;
+	unsigned last_created_fd;
+};
+```
 
 ---
 
@@ -628,6 +638,63 @@ void process_exit(void){
 이후, 부모 프로세스는 자식 프로세스를 자식 프로세스 리스트에서 제거하고 위 `process_exit`에서 호출된 `sema_down(&t->exit_sema)`를 다시 올려주는 `sema_up(&t->exit_sema)`
 
 이후, `exit_status`를 반환한다. 
+
+---
+
+Deny Write on Executables 
+: 실행 파일에 Write 접근 금지
+
+--- 
+
+실행 중인 파일에 대한 쓰기 작업을 거부하는 코드를 추가해주었다. 
+
+```c
+static bool 
+load(const char *file_name, struct intr_frame *if_){
+.
+.
+	file_deny_write(file);
+.
+.
+}
+```
+---
+
+페이지 폴트 문제 해결
+
+---
+
+페이지 폴트가 발생하는 상황에 kill을 사용하여 오류 상태를 터미널로 전달하고 있었어서 일부 테스트 케이스가 통과하지 않았다. 
+이를 해결하기 위해 exit를 사용해서 종료시켰다. 
+
+```c
+static void
+page_fault (struct intr_frame *f) {
+	bool not_present;  
+	bool write;        
+	bool user;         
+	void *fault_addr; 
+
+	fault_addr = (void *) rcr2();
+
+	not_present = (f->error_code & PF_P) == 0;
+	write = (f->error_code & PF_W) != 0;
+	user = (f->error_code & PF_U) != 0;
+
+	page_fault_cnt++;
+	if (user)
+	{
+		f->R.rdi = -1;
+		exit(f->R.rdi);
+	}
+.
+.
+.
+
+}
+```
+---
+
 
 <hr>
 <hr>

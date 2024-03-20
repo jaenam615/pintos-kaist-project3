@@ -393,7 +393,6 @@ process_exit (void) {
 	struct list_elem *e = list_begin(&exit_list);
 	for(int i = 2; i< t->last_created_fd; ++i){
 		close(i);
-		free(find_file_descriptor(i)->file);
 	}
 
 	file_close(t->running);
