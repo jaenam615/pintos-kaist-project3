@@ -220,7 +220,8 @@ thread_print_stats (void) {
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
- thread_create (const char *name, int priority, thread_func *function, void *aux) {
+ thread_create (const char *name, int priority,
+		thread_func *function, void *aux) {
 	struct thread *t;
 	tid_t tid;
 
@@ -250,6 +251,8 @@ tid_t
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+
 	// t->tf.rsp = USER_STACK;
   	list_push_back(&thread_current()->child_list, &t->child_list_elem);
 	/* Add to run queue. */
@@ -625,6 +628,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	sema_init(&t->process_sema, 0);
 	list_init(&t->process_sema.waiters);
 	t->last_created_fd = 2;
+
 	// sema_init(&t->process_sema, 0);
 #endif
 

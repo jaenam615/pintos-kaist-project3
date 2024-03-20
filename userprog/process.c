@@ -224,17 +224,37 @@ __do_fork (void *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
-	struct list_elem* e = list_begin(&parent->fd_table);
-		for(int i = 0; i< list_size(&parent->fd_table); ++i)
-		{
-			struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
-			struct file_descriptor* tmp_file_desc;
-			tmp_file_desc->fd = file_desc->fd;
-			tmp_file_desc->file = file_duplicate(file_desc->file);
-			list_push_back(&tmp_file_desc->fd_elem,&current->fd_table);
+	// struct list_elem* e = list_begin(&parent->fd_table);
+	// 	for(int i = 0; i< list_size(&parent->fd_table); ++i)
+	// 	{
+	// 		struct file_descriptor* file_desc =list_entry(e,struct file_descriptor, fd_elem);
+	// 		struct file_descriptor* tmp_file_desc;
+	// 		tmp_file_desc->fd = file_desc->fd;
+	// 		tmp_file_desc->file = file_duplicate(file_desc->file);
+	// 		list_push_back(&tmp_file_desc->fd_elem,&current->fd_table);
 			
+	// 	}
+	// current->last_created_fd = parent->last_created_fd;
+
+	struct list_elem* e = list_begin(&parent->fd_table);
+	struct list *parent_list = &parent->fd_table;
+	if(!list_empty(parent_list)){
+		for (e ; e != list_end(parent_list) ; e = list_next(e)){
+			struct file_descriptor* parent_fd =list_entry(e,struct file_descriptor, fd_elem);
+			if(parent_fd->file != NULL){
+				struct file_descriptor *child_fd = malloc(sizeof(struct file_descriptor));
+				child_fd->file = file_duplicate(parent_fd->file);
+				child_fd->fd = parent_fd->fd;
+				list_push_back(&current->fd_table, & child_fd->fd_elem);
+			}
+			current->last_created_fd = parent->last_created_fd;
 		}
-	current->last_created_fd = parent->last_created_fd;
+		current->last_created_fd = parent->last_created_fd;
+	} else {
+		current->last_created_fd = parent->last_created_fd;
+	}
+
+	if_.R.rax = 0;
 
     // 로드가 완료될 때까지 기다리고 있던 부모 대기 해제
     sema_up(&current->process_sema);
@@ -348,6 +368,14 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *t = thread_current();
+
+
+	if (t->pml4 != NULL){
+		printf("%s: exit(%d)\n", t->name, t->exit_status);
+		file_close(t->running);
+		t->running = NULL;
+	}
+
 
 	struct list *exit_list = &t->fd_table;
 	struct list_elem *e = list_begin(&exit_list);
