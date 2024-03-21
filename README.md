@@ -1,5 +1,5 @@
 PintOS_Project
-크래프톤 정글 4기 pintOS과제 Project 3
+크래프톤 정글 4기 pintOS과제 Project 3  
 
 카이스트 CS330의 핀토스 과제입니다.
 
