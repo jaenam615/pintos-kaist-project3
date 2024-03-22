@@ -62,19 +62,47 @@ err:
 
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
-spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
+spt_find_page (struct supplemental_page_table *spt, void *va) {
+	struct page *_page = NULL;
 	/* TODO: Fill this function. */
 
-	return page;
+	// IMPLEMENTATION
+	// 리스트 탐색
+	if (!list_empty(&spt->page_table)){
+		struct list *ptl = &spt->page_table;
+		struct list_elem * e;
+		for (e = list_begin (ptl); e != list_end (ptl); e = list_next (e))
+		{
+			_page = list_entry(e, struct page, page_elem);
+			if (_page->va == va){
+				return _page;
+			}
+		}	
+	}
+
+	return _page;
 }
 
 /* Insert PAGE into spt with validation. */
 bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
+spt_insert_page (struct supplemental_page_table *spt,
+		struct page *page) {
 	int succ = false;
 	/* TODO: Fill this function. */
+
+	// IMPLEMENTATION
+	//validation
+	struct list_elem *e;
+	struct page *_page;
+	for(e = list_begin(&spt->page_table) ; e != list_end(&spt->page_table); e = list_next(e)){
+		_page = list_entry(e, struct page, page_elem);		 
+		if(_page->va == page->va){
+			return succ;
+		}
+	}
+	//supplemental page table 삽입
+	list_insert(&spt->page_table, &page->page_elem);
+	succ = true;
 
 	return succ;
 }
@@ -173,7 +201,10 @@ vm_do_claim_page (struct page *page) {
 
 /* Initialize new supplemental page table */
 void
-supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_init (struct supplemental_page_table *spt) {
+	
+	// IMPLEMENTATION
+	list_init(&spt->page_table);
 }
 
 /* Copy supplemental page table from src to dst */
