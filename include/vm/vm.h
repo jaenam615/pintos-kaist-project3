@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 
+struct lock page_lock;
+
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -46,6 +48,8 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	struct list_elem page_elem;
+
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -63,6 +67,10 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+
+	//IMPLEMENTATION
+	uint64_t pml4;
+	struct list_elem frame_elem;
 };
 
 /* The function table for page operations.
@@ -85,6 +93,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct list page_table;
 };
 
 #include "threads/thread.h"

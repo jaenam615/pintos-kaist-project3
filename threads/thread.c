@@ -15,6 +15,10 @@
 #include "userprog/process.h"
 #endif
 
+#ifdef VM
+#include "vm/vm.h"
+#endif
+
 // advanced scheduling 용도
 //17.14 형식의 고정소수점 표현 
 #define P 17
@@ -349,6 +353,7 @@ thread_exit (void) {
 	intr_disable ();
 	// list_remove(&thread_current()->all_elem);
 	do_schedule (THREAD_DYING);
+	palloc_free_page(thread_current());
 	NOT_REACHED ();
 }
 
@@ -630,6 +635,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->last_created_fd = 2;
 
 	// sema_init(&t->process_sema, 0);
+#endif
+
+#ifdef VM
+	list_init(&t->spt.page_table);
 #endif
 
 	if (thread_mlfqs == true){

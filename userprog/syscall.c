@@ -266,6 +266,7 @@ bool remove (const char *file)
 		exit(-1);
 	lock_acquire(&filesys_lock);
 	bool success =  filesys_remove(file);
+	// palloc_free_page(file);
 	lock_release(&filesys_lock);
 
 	return success;
@@ -275,6 +276,9 @@ bool remove (const char *file)
 //fd반환
 int open (const char *file) 
 {
+	if (thread_current()->last_created_fd == 126){
+		exit(126);
+	}
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
 	lock_acquire(&filesys_lock);
@@ -424,6 +428,9 @@ int process_add_file(struct file *f)
 	struct file_descriptor *new_fd = malloc(sizeof(struct file_descriptor));
 
 	// curr에 있는 fd_table의 fd를 확인하기 위한 작업
+	if (curr->last_created_fd >= 126){
+		return -1;
+	}
 	curr->last_created_fd += 1;
 	new_fd->fd = curr->last_created_fd;
 	new_fd->file = f;

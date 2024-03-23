@@ -107,7 +107,7 @@ process_create_initd (const char *file_name) {
 	 * FILE_NAME의 복사본을 만듭니다.
 	 * 그렇지 않으면 발신자와 load() 사이에 경합이 발생합니다.
 	 */
-	fn_copy = palloc_get_page (0);
+	fn_copy = palloc_get_page (PAL_USER);
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
@@ -120,9 +120,15 @@ process_create_initd (const char *file_name) {
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 
-	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);
-	return 	tid;
+	// if (tid == TID_ERROR)
+	// 	palloc_free_page (fn_copy);
+
+	if (tid == TID_ERROR){
+		palloc_free_page(fn_copy);
+		palloc_free_page(file_name);
+	}
+
+	return tid == TID_ERROR? TID_ERROR: tid;
 }
 
 
@@ -267,6 +273,9 @@ __do_fork (struct parent_info *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
+	if (current->last_created_fd == 126){
+		goto error;
+	}
 
 	struct list_elem* e = list_begin(&parent->fd_table);
 	struct list *parent_list = &parent->fd_table;
@@ -297,6 +306,7 @@ __do_fork (struct parent_info *aux) {
         do_iret(&if_);
 error:
     // sema_up(&current->process_sema);
+	sema_up(&current->process_sema);
     exit(TID_ERROR);
 }
 
@@ -834,6 +844,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		void *aux = NULL;
+		struct aux
+
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux))
 			return false;
