@@ -111,8 +111,8 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-	struct list fd_table;
-	unsigned last_created_fd;
+	// struct list fd_table;
+	// unsigned last_created_fd;
 
 
 #endif
@@ -125,15 +125,12 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 
-	//구현
+	//IMPLEMENTATION
 	struct list child_list;
 	struct list_elem child_list_elem;
 
 	struct thread *parent;
-
-
 	int exit_status; 
-
 	struct intr_frame parent_tf;
 	// struct file **descriptor_table;
 	int fd_idx;
@@ -143,6 +140,10 @@ struct thread {
 	struct semaphore process_sema;
 	struct semaphore wait_sema;
 	struct semaphore exit_sema;
+
+	struct list fd_table;
+	unsigned last_created_fd;
+
 };
 
 struct file_descriptor
