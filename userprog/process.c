@@ -205,6 +205,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    TODO: NEWPAGE. */
 	newpage = palloc_get_page(PAL_USER);
 	if (newpage == NULL){
+		palloc_free_page(newpage);
+
 		return false;
 	}
 	// newpage = pte;
@@ -222,6 +224,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 		/* 6. TODO: if fail to insert page, do error handling. 
 		 * 6. 작업: 페이지를 삽입하지 못할 경우 오류 처리를 수행합니다.
 		 */
+		palloc_free_page(newpage);
 		return false;
 
 	}
@@ -285,6 +288,10 @@ __do_fork (struct parent_info *aux) {
 			if(parent_fd->file != NULL){
 				struct file_descriptor *child_fd = malloc(sizeof(struct file_descriptor));
 				child_fd->file = file_duplicate(parent_fd->file);
+				if (child_fd->file == NULL){
+					free(child_fd);
+					continue; 
+				}
 				child_fd->fd = parent_fd->fd;
 				list_push_back(&current->fd_table, & child_fd->fd_elem);
 			}
@@ -399,12 +406,12 @@ process_exit (void) {
 		t->running = NULL;
 	}
 
-	struct list *exit_list = &t->fd_table;
-	struct list_elem *e = list_begin(&exit_list);
+	// struct list *exit_list = &t->fd_table;
+	// struct list_elem *e = list_begin(&exit_list);
 	for(int i = 2; i< t->last_created_fd; ++i){
 		close(i);
 	}
-
+	
 	file_close(t->running);
 	process_cleanup();
 	sema_up(&t->wait_sema);
@@ -645,6 +652,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
+	// if (success == false);
 	// file_close (file);
 	return success;
 }
@@ -800,7 +808,7 @@ install_page (void *upage, void *kpage, bool writable) {
 	/* Verify that there's not already a page at that virtual
 	 * address, then map our page there. */
 	return (pml4_get_page (t->pml4, upage) == NULL
-			&& pml4_set_page (t->pml4, upage, kpage, writable));
+			&& pml4_set_page (t->pml4, upage, kpage, writable)); 
 }
 #else
 /* From here, codes will be used after project 3.
@@ -812,6 +820,20 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	struct lazy *lazy = (struct lazy*)aux;
+	void* buf = page->frame->kva;
+	file_seek(lazy->file, lazy->ofs);
+
+	if(file_read(lazy->file, &buf, lazy->read_bytes) == NULL){
+		palloc_free_page(page);	
+		return false;
+	}
+
+	void* start;
+	start = page->frame->kva + lazy->read_bytes;
+	memset(start,0,lazy->zero_bytes);
+	return true;
+
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -843,12 +865,18 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
-		struct aux
+		struct lazy *aux = (struct lazy*)malloc(sizeof(struct lazy));
+		aux->file = file;
+		aux->ofs = ofs;
+		aux->read_bytes = page_read_bytes;
+		aux->zero_bytes = page_read_bytes;
 
+		//실패시 메모리 반환 및 false반환
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, aux)){
+			free(aux);
 			return false;
+		}
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
