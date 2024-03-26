@@ -3,6 +3,9 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "list.h"
+#include "include/threads/vaddr.h"
+#include "include/lib/kernel/hash.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -36,6 +39,9 @@ page_get_type (struct page *page) {
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
 static struct frame *vm_evict_frame (void);
+/* implementation - pongpongie */
+static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
+static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
 
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
@@ -62,19 +68,35 @@ err:
 
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
-spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
+spt_find_page (struct supplemental_page_table *spt, void *va) {
 	struct page *page = NULL;
-	/* TODO: Fill this function. */
+    struct hash_elem *element;
 
-	return page;
+    // implementation - pongpongie
+    page->va = va;
+    element = hash_find(&spt->spt_hash, &page->hash_elem);
+    if (element != NULL){
+        page = hash_entry(element, struct page, hash_elem);
+    }
+    return page;
 }
 
 /* Insert PAGE into spt with validation. */
 bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
-	int succ = false;
-	/* TODO: Fill this function. */
+spt_insert_page (struct supplemental_page_table *spt,
+		struct page *page) {
+    struct page *p;
+    struct page_elem *element;
+    bool succ = true;
+
+    // implementation - pongpongie    
+    // TODO: 인자로 주어진 spt에 페이지 구조체를 삽입한다.
+    // TODO: 가상 주소가 spt에 존재하는지 확인해야한다.
+    if (!spt_find_page(&spt->spt_hash, page->va))
+    {
+        succ = false;
+    }
+    hash_insert(&spt->spt_hash, &page->hash_elem);
 
 	return succ;
 }
@@ -111,8 +133,11 @@ vm_evict_frame (void) {
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	// implementation - pongpongie
 
+    frame = palloc_get_page(PAL_USER);  // palloc으로 가져온 페이지에 프레임 할당
+    // TODO: 프레임 구조체 멤버 초기화
+    // TODO: 페이지 할당 실패 했을 때 어떻게 swap out 할 지.
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 	return frame;
@@ -150,10 +175,12 @@ vm_dealloc_page (struct page *page) {
 
 /* Claim the page that allocate on VA. */
 bool
-vm_claim_page (void *va UNUSED) {
+vm_claim_page (void *va) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
+    // implementation - pongpongie
 
+    page->va;
 	return vm_do_claim_page (page);
 }
 
@@ -167,13 +194,17 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-
+    // implementation - pongpongie
+    // 가상 주소와 물리 주소를 매핑한 정보를 페이지 테이블에 추가하기
+    
 	return swap_in (page, frame->kva);
 }
 
 /* Initialize new supplemental page table */
 void
-supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_init (struct supplemental_page_table *spt /* UNUSED */) {
+    // implementation - pongpongie
+    hash_init(&spt->spt_hash, page_hash, page_less, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -188,3 +219,30 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 }
+
+/* implementation - pongpongie */
+unsigned
+page_hash (const struct hash_elem *p_, void *aux UNUSED) {
+  const struct page *p = hash_entry (p_, struct page, hash_elem);
+  return hash_bytes (&p->va, sizeof p->va);
+}
+
+bool
+page_less (const struct hash_elem *a_,
+           const struct hash_elem *b_, void *aux UNUSED) {
+  const struct page *a = hash_entry (a_, struct page, hash_elem);
+  const struct page *b = hash_entry (b_, struct page, hash_elem);
+
+  return a->va < b->va;
+}
+
+// /* Returns the page containing the given virtual address, or a null pointer if no such page exists. */
+// struct page *
+// page_lookup (const void *address) {
+//   struct page p;
+//   struct hash_elem *e;
+
+//   p.addr = address;
+//   e = hash_find (&pages, &p.hash_elem);
+//   return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
+// }

@@ -275,6 +275,9 @@ bool remove (const char *file)
 //fd반환
 int open (const char *file) 
 {
+    if (thread_current()->last_created_fd == 126){
+        exit(126);
+    }
 	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
 	lock_acquire(&filesys_lock);

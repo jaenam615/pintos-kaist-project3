@@ -120,9 +120,12 @@ process_create_initd (const char *file_name) {
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 
-	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);
-	return 	tid;
+	if (tid == TID_ERROR){
+        palloc_free_page (fn_copy);
+        palloc_free_page (file_name);
+    }
+		
+	return 	tid == TID_ERROR? TID_ERROR : tid;
 }
 
 
@@ -267,6 +270,9 @@ __do_fork (struct parent_info *aux) {
      * TODO:       in include/filesys/file.h. Note that parent should not return
      * TODO:       from the fork() until this function successfully duplicates
      * TODO:       the resources of parent.*/
+    if (current->last_created_fd == 126){
+        goto error;
+    }
 
 	struct list_elem* e = list_begin(&parent->fd_table);
 	struct list *parent_list = &parent->fd_table;
@@ -296,7 +302,7 @@ __do_fork (struct parent_info *aux) {
     if (succ)
         do_iret(&if_);
 error:
-    // sema_up(&current->process_sema);
+    sema_up(&current->process_sema);
     exit(TID_ERROR);
 }
 
