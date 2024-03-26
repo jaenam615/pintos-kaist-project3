@@ -3,9 +3,10 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "include/lib/kernel/hash.h"
-
+#include "threads/mmu.h"
 
 struct lock page_lock;
+struct list frame_list;
 
 enum vm_type {
 	/* page not initialized */

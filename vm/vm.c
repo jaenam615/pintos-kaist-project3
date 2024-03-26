@@ -19,6 +19,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&frame_list);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -79,9 +80,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		uninit_new(_page, upage, init, type, aux, init_func);
 		_page->writable = writable;
 		/* TODO: Insert the page into the spt. */
-		// lock_acquire(&page_lock);
+		lock_acquire(&page_lock);
 		bool result = spt_insert_page(&spt,&_page);
-		// lock_release(&page_lock);
+		lock_release(&page_lock);
 		return result;
 	}
 err:
@@ -115,15 +116,11 @@ spt_insert_page (struct supplemental_page_table *spt,
 		struct page *page) {
 	/* TODO: Fill this function. */
 	// IMPLEMENTATION
-	//validation
-	struct page *_page = (struct page*)malloc(sizeof(struct page));
-	//동적할당 실패 시 false반환
-	if(_page == NULL){
-		return false;
+	//validation	
+	if (hash_insert(&spt->spt_hash, &page->hash_elem)== NULL){
+		return true;
 	}
-
-
-	return true;
+	return false;
 }
 
 
@@ -174,6 +171,7 @@ vm_get_frame (void) {
 	//initialize its members
 	frame->kva = _kva;
 	frame->page = NULL; 
+	list_push_back(&frame_list, &frame->frame_elem);
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -234,11 +232,11 @@ vm_claim_page (void *va) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
 	//IMPLEMENTATION
-	// page = palloc_get_page(PAL_USER);
-	// page = spt_find_page(&thread_current()->spt,va);
-	// if (page == NULL){
-	// 	return false; 
-	// }
+	page = palloc_get_page(PAL_USER);
+	page = spt_find_page(&thread_current()->spt,va);
+	if (page == NULL){
+		return false; 
+	}
 	return vm_do_claim_page (page);
 }
 
@@ -257,12 +255,13 @@ vm_do_claim_page (struct page *page) {
 	//mapping from virtual address to a physical address in the current process' page table
 	struct thread *t = thread_current();
 
-
-	// void* _kva = pml4_get_page(t->pml4, page->va);
-	// if (_kva == NULL){
-	// 	return false; 
-	// }
-	// pml4_set_page(t->pml4, )
+	void* _kva = pml4_get_page(t->pml4, page->va);
+	if (_kva == NULL){
+		return false; 
+	}
+	if (!pml4_set_page(t->pml4 , page->va , frame->kva, page->writable)){
+		return false;
+	}
 
 	return swap_in (page, frame->kva);
 }

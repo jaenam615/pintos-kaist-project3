@@ -896,7 +896,14 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-
+	struct page *kpage = (struct page*)malloc(sizeof(struct page));
+	kpage->va = palloc_get_page (PAL_USER);
+	if (kpage->va == NULL){
+		free(kpage);
+		return success;
+	}
+	memset(kpage, 0, sizeof(struct page));
+	success = true; 
 	return success;
 }
 #endif /* VM */

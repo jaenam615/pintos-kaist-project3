@@ -22,6 +22,7 @@ void
 vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
 	swap_disk = NULL;
+	
 }
 
 /* Initialize the file mapping */
