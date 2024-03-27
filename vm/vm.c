@@ -76,8 +76,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
          */ 
 
         /* 페이지를 spt에 삽입하라 */
-
-
         struct page *p;
         p = palloc_get_page(PAL_USER);
         if (p == NULL)
@@ -143,8 +141,9 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
-	 /* TODO: The policy for eviction is up to you. */
-
+	/* TODO: The policy for eviction is up to you. */
+    // implementation - pongpongie
+    list_pop_front(&frame_table);
 	return victim;
 }
 
@@ -152,9 +151,12 @@ vm_get_victim (void) {
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
-	/* TODO: swap out the victim and return the evicted frame. */
+	struct frame *victim = vm_get_victim ();
 
+	/* TODO: swap out the victim and return the evicted frame. */
+    // implementation - pongpongie
+    if (swap_out(victim->page) == true);
+        return victim;
 	return NULL;
 }
 
@@ -176,9 +178,11 @@ vm_get_frame (void) {
     frame->page = NULL;
 
     frame->kva = palloc_get_page(PAL_USER);  // palloc으로 가져온 페이지에 프레임 할당
-    vm_evict_frame();  // 페이지 쫓아내기
-
-    list_push_back(frame_table);  // 프레임 테이블에 프레임 추가
+    if (frame->kva == NULL)
+    {
+        vm_evict_frame();  // 페이지 쫓아내기
+    }
+    list_push_back(&frame_table, frame);  // 프레임 테이블에 프레임 추가
     
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -260,18 +264,56 @@ supplemental_page_table_init (struct supplemental_page_table *spt /* UNUSED */) 
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst,
+	struct supplemental_page_table *src) {
+    // implementation - pongpongie
+
+    struct hash_iterator *i;
+    struct page *new_page;
+    hash_first (&i, &src->spt_hash);
+    while (hash_next (&i))
+    {
+        struct page *page = hash_entry (hash_cur (&i), struct page, hash_elem);
+
+        if (page_get_type(page) == VM_FILE)
+        {
+            new_page->va = palloc_get_page(PAl_USER);
+            vm_alloc_page(VM_FILE, &new_page->va, true);
+
+        }
+        if (page_get_type(page) == VM_ANON)
+        {
+            new_page->va = palloc_get_page(PAl_USER);
+            vm_alloc_page(VM_ANON, &new_page->va, true);
+        }
+        else {
+            new_page = palloc_get_page(PAl_USER);
+            page->writable = new_page->writable;
+            page->uninit.init = new_page->uninit.init;
+            page->uninit.type = new_page->uninit.type;
+            page->uninit.aux = new_page->uninit.aux;
+            page->uninit.page_initializer = new_page->uninit.page_initializer;
+        }
+        
+    }
 }
 
 /* Free the resource hold by the supplemental page table */
 void
-supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+
+    // implementation - pongpongie
+    hash_destroy(&spt->spt_hash, hash_free);
 }
 
 /* implementation - pongpongie */
+
+hash_action_func hash_free (struct hash_elem *e, void *aux){
+    
+}
+
 unsigned
 page_hash (const struct hash_elem *p_, void *aux UNUSED) {
   const struct page *p = hash_entry (p_, struct page, hash_elem);
