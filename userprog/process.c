@@ -822,13 +822,14 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: VA is available when calling this function. */
 	struct lazy *lazy = (struct lazy*)aux;
 	void* buf = page->frame->kva;
+	//file에서의 위치를 시작에서부터 ofs만큼으로 설정
 	file_seek(lazy->file, lazy->ofs);
-
-	if(file_read(lazy->file, &buf, lazy->read_bytes) == NULL){
+	//file에서 read_bytes만큼 buf로 read한다
+	if(file_read(lazy->file, buf, lazy->read_bytes) == NULL){
 		palloc_free_page(page);	
 		return false;
 	}
-
+	//read_bytes로 설정한 이후 부분부터 zero_bytes만큼 0으로 채운다
 	void* start;
 	start = page->frame->kva + lazy->read_bytes;
 	memset(start,0,lazy->zero_bytes);
@@ -865,6 +866,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
+		//lazy_load_segment로 전달할 auxilary data를 설정
+		//lazy구조체는 vm.h에서 정의했다
+
 		struct lazy *aux = (struct lazy*)malloc(sizeof(struct lazy));
 		aux->file = file;
 		aux->ofs = ofs;
@@ -874,9 +878,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		//실패시 메모리 반환 및 false반환
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux)){
-			free(aux);
 			return false;
 		}
+		free(aux);
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
@@ -896,14 +900,16 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-	struct page *kpage = (struct page*)malloc(sizeof(struct page));
-	kpage->va = palloc_get_page (PAL_USER);
-	if (kpage->va == NULL){
-		free(kpage);
-		return success;
+	//Mapping stack on stack_bottom
+	//UNINIT 페이지 생성
+	if(vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL)){
+		//성공 시 곧바로 물리 프레임을 할당
+		vm_claim_page(stack_bottom);
+		// spt_find_page(&thread_current()->spt, stack_bottom)
+		success = true;
+		//이 위치에서부터 argument_stack으로부터 인자가 쌓인다
+		if_->rsp = USER_STACK;
 	}
-	memset(kpage, 0, sizeof(struct page));
-	success = true; 
 	return success;
 }
 #endif /* VM */
