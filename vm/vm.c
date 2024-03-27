@@ -305,65 +305,39 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 }
 
 /* Copy supplemental page table from src to dst */
-// bool
-// supplemental_page_table_copy (struct supplemental_page_table *dst,
-// 		struct supplemental_page_table *src) {
+bool
+supplemental_page_table_copy (struct supplemental_page_table *dst,
+		struct supplemental_page_table *src) {
 	
-// 	//IMPLEMENTATION
-// 	//get first entry
-// 	struct hash_iterator i;
-// 	hash_first(&i, &src->spt_hash);
-// 	bool final = false;
-// 	//iterate through entries and copy them 
-// 	while (hash_next (&i))
-// 	{
-// 		struct page *src_p = hash_entry (hash_cur (&i), struct page, hash_elem);
-// 		struct page *dst_p = (struct page*)malloc(PGSIZE);
-// 		dst_p->va = src_p->va;
+	//IMPLEMENTATION
+	//get first entry
+	struct hash_iterator i;
+	hash_first(&i, &src->spt_hash);
+	bool final = false;
+	//iterate through entries and copy them 
+	while (hash_next (&i))
+	{
+		struct page *src_p = hash_entry (hash_cur (&i), struct page, hash_elem);
+		struct page *dst_p = (struct page*)malloc(PGSIZE);
+		dst_p->va = src_p->va;
 	
-// 		enum vm_type type = page_get_type(src_p);
-// 		if (type == VM_UNINIT){
-// 			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, src_p->uninit.init, NULL);
-// 		}else if (type == VM_ANON){
-// 			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, anon_initializer, NULL);
-// 		} else if (type == VM_FILE) {
-// 			struct lazy *aux = (struct lazy*)malloc(sizeof(struct lazy));
-// 			aux->file = src_p->file.file;
-// 			aux->ofs = src_p->file.ofs;
-// 			aux->read_bytes = src_p->file.read_bytes; 
-// 			aux->zero_bytes = src_p->file.zero_bytes;
-// 			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, file_backed_initializer, aux);
-// 		}
-// 	}
-// 	return final; 
-// }
-
-bool supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct supplemental_page_table *src UNUSED) {
-    struct hash_iterator i;
-    hash_first (&i, &src->spt_hash);
-    while (hash_next (&i)) {	// src의 각각의 페이지를 반복문을 통해 복사
-        struct page *parent_page = hash_entry (hash_cur (&i), struct page, hash_elem);   // 현재 해시 테이블의 element 리턴
-        enum vm_type type = page_get_type(parent_page);		// 부모 페이지의 type
-        void *upage = parent_page->va;						// 부모 페이지의 가상 주소
-        bool writable = parent_page->writable;				// 부모 페이지의 쓰기 가능 여부
-        vm_initializer *init = parent_page->uninit.init;	// 부모의 초기화되지 않은 페이지들 할당 위해 
-        void* aux = parent_page->uninit.aux;
-
-        if(parent_page->operations->type == VM_UNINIT) {	// 부모 타입이 uninit인 경우
-            if(!vm_alloc_page_with_initializer(type, upage, writable, init, aux)) // 부모의 타입, 부모의 페이지 va, 부모의 writable, 부모의 uninit.init, 부모의 aux (container)
-                return false;
-        }
-        else {
-            if(!vm_alloc_page(type, upage, writable))
-                return false;
-            if(!vm_claim_page(upage))
-                return false;
-			struct page* child_page = spt_find_page(dst, upage);
-            memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
-        }
-    }
-    return true;
+		enum vm_type type = page_get_type(src_p);
+		if (type == VM_UNINIT){
+			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, src_p->uninit.init, NULL);
+		}else if (type == VM_ANON){
+			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, anon_initializer, NULL);
+		} else if (type == VM_FILE) {
+			struct lazy *aux = (struct lazy*)malloc(sizeof(struct lazy));
+			aux->file = src_p->file.file;
+			aux->ofs = src_p->file.ofs;
+			aux->read_bytes = src_p->file.read_bytes; 
+			aux->zero_bytes = src_p->file.zero_bytes;
+			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, file_backed_initializer, aux);
+		}
+	}
+	return final; 
 }
+
 
 /* Free the resource hold by the supplemental page table */
 void
