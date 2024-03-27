@@ -43,6 +43,7 @@ static struct frame *vm_evict_frame (void);
 /* implementation - pongpongie */
 static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
 static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+struct list frame_table; // TODO: frame table 초기화 해주어야 함
 
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
@@ -171,10 +172,14 @@ vm_get_frame (void) {
 	struct frame *frame = NULL;
 	// implementation - pongpongie
 
-    frame = palloc_get_page(PAL_USER);  // palloc으로 가져온 페이지에 프레임 할당
     frame->kva = NULL;  // 프레임 구조체 멤버 초기화
     frame->page = NULL;
-    // TODO: 페이지 할당 실패 했을 때 어떻게 swap out 할 지.
+
+    frame->kva = palloc_get_page(PAL_USER);  // palloc으로 가져온 페이지에 프레임 할당
+    vm_evict_frame();  // 페이지 쫓아내기
+
+    list_push_back(frame_table);  // 프레임 테이블에 프레임 추가
+    
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 	return frame;
