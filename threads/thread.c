@@ -353,7 +353,7 @@ thread_exit (void) {
 	intr_disable ();
 	// list_remove(&thread_current()->all_elem);
 	do_schedule (THREAD_DYING);
-	palloc_free_page(thread_current());
+	// palloc_free_page(thread_current());
 	NOT_REACHED ();
 }
 
@@ -637,9 +637,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	// sema_init(&t->process_sema, 0);
 #endif
 
-#ifdef VM
-	list_init(&t->spt.page_table);
-#endif
+// #ifdef VM
+// 	supplemental_page_table_init(&t->spt);
+// #endif
 
 	if (thread_mlfqs == true){
 		// if (t == initial_thread){

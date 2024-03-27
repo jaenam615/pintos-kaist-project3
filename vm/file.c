@@ -1,6 +1,8 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "threads/mmu.h"
+#include "userprog/process.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -24,6 +26,10 @@ bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
 	page->operations = &file_ops;
+	page->file.file = ((struct lazy*)(page->uninit.aux))->file;
+	page->file.ofs =((struct lazy*)(page->uninit.aux))->ofs;
+	page->file.read_bytes = ((struct lazy*)(page->uninit.aux))->read_bytes;
+	page->file.zero_bytes = ((struct lazy*)(page->uninit.aux))->zero_bytes;
 
 	struct file_page *file_page = &page->file;
 }
