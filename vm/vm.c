@@ -6,6 +6,7 @@
 #include "list.h"
 #include "include/threads/vaddr.h"
 #include "include/lib/kernel/hash.h"
+#include "include/threads/mmu.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -46,6 +47,10 @@ static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, v
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
+/* 
+ * initializer를 사용하여 보류 중인 페이지 객체를 만든다.
+ * 페이지를 만들고 싶으면, 이 함수를 거쳐서 만들거나 'vm_alloc_page'를 통해 만들어야 한다.
+ */
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
@@ -56,11 +61,38 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
+        
 		/* TODO: Create the page, fetch the initialier according to the VM type,
 		 * TODO: and then create "uninit" page struct by calling uninit_new. You
 		 * TODO: should modify the field after calling the uninit_new. */
 
 		/* TODO: Insert the page into the spt. */
+
+        /* 페이지를 만들고, VM type에 따른 initializer를 가져온다.
+         * uninit_new 함수를 통해 uninit page 구조체를 만든다.
+         * uninit_new를 호출하고 난 다음에 필드를 수정해야 한다.
+         * 초기화되지 않은 주어진 type의 페이지를 생성한다.
+         */ 
+
+        /* 페이지를 spt에 삽입하라 */
+
+
+        struct page *p;
+        p = palloc_get_page(PAL_USER);
+        if (p == NULL)
+            return false;
+        switch (type)
+        {
+        case VM_ANON:
+            uninit_new(p, upage, init, type, aux, anon_initializer);
+            break;
+        case VM_FILE:
+            uninit_new(p, upage, init, type, aux, file_backed_initializer);
+            break;
+        default:
+            return false;
+        }
+        spt_insert_page(spt, p);
 	}
 err:
 	return false;
@@ -97,7 +129,6 @@ spt_insert_page (struct supplemental_page_table *spt,
         succ = false;
     }
     hash_insert(&spt->spt_hash, &page->hash_elem);
-
 	return succ;
 }
 
@@ -130,13 +161,19 @@ vm_evict_frame (void) {
  * and return it. This always return valid address. That is, if the user pool
  * memory is full, this function evicts the frame to get the available memory
  * space.*/
+/*
+ * palloc()을 하고 프레임을 가져온다. 만약 사용 가능한 페이지가 없으면, 페이지를 쫓아내고 반환한다.
+ * 항상 유효한 주소를 리턴해야한다. 그 말은 곧, user pool이 꽉 차있으면 이 함수는 프레임을 쫓아내고
+ * 사용 가능한 메모리 공간을 가져온다는 말이다.
+ */
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	// implementation - pongpongie
 
     frame = palloc_get_page(PAL_USER);  // palloc으로 가져온 페이지에 프레임 할당
-    // TODO: 프레임 구조체 멤버 초기화
+    frame->kva = NULL;  // 프레임 구조체 멤버 초기화
+    frame->page = NULL;
     // TODO: 페이지 할당 실패 했을 때 어떻게 swap out 할 지.
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -178,16 +215,20 @@ bool
 vm_claim_page (void *va) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
-    // implementation - pongpongie
-
-    page->va;
+    
+    // implementation - pongpongi
+    // 인자로 주어진 va에 페이지 할당
+    // 그 페이지를 인자로 갖는 vm_do_claim_page 호출
+    va = palloc_get_page(PAL_USER);
+    page->va = va;
 	return vm_do_claim_page (page);
 }
 
 /* Claim the PAGE and set up the mmu. */
+/* 페이지를 요정하고 mmu를 세팅한다. */
 static bool
 vm_do_claim_page (struct page *page) {
-	struct frame *frame = vm_get_frame ();
+	struct frame *frame = vm_get_frame();
 
 	/* Set links */
 	frame->page = page;
@@ -195,8 +236,13 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
     // implementation - pongpongie
-    // 가상 주소와 물리 주소를 매핑한 정보를 페이지 테이블에 추가하기
-    
+    // MMU 세팅; 가상 주소와 물리 주소를 매핑한 정보를 페이지 테이블에 추가하기
+    struct thread *t = thread_current();
+    frame->kva = pml4_get_page(t->pml4, page);
+    if (frame->kva == NULL)
+        return false;
+    if (!pml4_set_page(t->pml4, page, frame->kva, page->writable))
+        return false;
 	return swap_in (page, frame->kva);
 }
 
