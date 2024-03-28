@@ -107,7 +107,10 @@ process_create_initd (const char *file_name) {
 	 * FILE_NAME의 복사본을 만듭니다.
 	 * 그렇지 않으면 발신자와 load() 사이에 경합이 발생합니다.
 	 */
-	fn_copy = palloc_get_page (PAL_USER);
+	//PROJECT 3 UPDATES
+	//fn_copy를 palloc_get_page(0)을 해야한다
+	fn_copy = palloc_get_page (0);
+	// fn_copy = palloc_get_page (PAL_USER);
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
@@ -279,7 +282,6 @@ __do_fork (struct parent_info *aux) {
 	if (current->last_created_fd == 126){
 		goto error;
 	}
-
 	struct list_elem* e = list_begin(&parent->fd_table);
 	struct list *parent_list = &parent->fd_table;
 	if(!list_empty(parent_list)){
@@ -820,19 +822,27 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	
 	struct lazy *lazy = (struct lazy*)aux;
-	void* buf = page->frame->kva;
+
+
+	//여기에서 오타가 있었나?
 	//file에서의 위치를 시작에서부터 ofs만큼으로 설정
 	file_seek(lazy->file, lazy->ofs);
 	//file에서 read_bytes만큼 buf로 read한다
-	if(file_read(lazy->file, buf, lazy->read_bytes) == NULL){
-		palloc_free_page(page);	
+	/* Load this page. */
+	lock_try_acquire(&filesys_lock);
+	if(file_read(lazy->file, page->frame->kva, lazy->read_bytes) != (int) lazy->read_bytes){
+		palloc_free_page(page->frame->kva);	
 		return false;
 	}
+	lock_release(&filesys_lock);
 	//read_bytes로 설정한 이후 부분부터 zero_bytes만큼 0으로 채운다
 	void* start;
 	start = page->frame->kva + lazy->read_bytes;
 	memset(start,0,lazy->zero_bytes);
+
+	file_seek(lazy->file,lazy->ofs);
 	return true;
 
 }
@@ -880,12 +890,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 					writable, lazy_load_segment, aux)){
 			return false;
 		}
-		free(aux);
+		// free(aux);
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		//이 부분을 추가해주어 project 3에서 지난 프로젝트 테스트 케이스 성공
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -904,18 +916,19 @@ setup_stack (struct intr_frame *if_) {
 	//UNINIT 페이지 생성
 	if(vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL)){
 		//성공 시 곧바로 물리 프레임을 할당
-		vm_claim_page(stack_bottom);
 		// spt_find_page(&thread_current()->spt, stack_bottom)
-		success = true;
 		//이 위치에서부터 argument_stack으로부터 인자가 쌓인다
-		if_->rsp = USER_STACK;
+		if (vm_claim_page(stack_bottom)){
+			success = true; 
+			if_->rsp = USER_STACK;
+			thread_current()->stack_bottom = stack_bottom;
+		}
 	}
 	return success;
 }
 #endif /* VM */
 
 struct thread *get_thread_from_tid(tid_t thread_id){
-
 	struct thread * t = thread_current();
 	struct list* child_list = &t->child_list;
 	struct list_elem* e;

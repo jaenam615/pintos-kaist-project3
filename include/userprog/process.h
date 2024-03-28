@@ -10,6 +10,12 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+// IMPLEMENTATION
+struct lazy{
+	struct file *file;
+	off_t ofs;
+	size_t read_bytes;
+	size_t zero_bytes;
+};
 
-
-#endif /* userprog/process.h */s
+#endif /* userprog/process.h */

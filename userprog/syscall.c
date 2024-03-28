@@ -206,11 +206,9 @@ void halt(void)
 //현재 유저 프로그램 종료 (status를 반환함)
 void exit(int status)
 {
-	// char* p_name = thread_current ()->name;
-	// char* p = "\0";
+
 	thread_current()->exit_status = status;
-	// strtok_r(p_name," ",&p);
-	// printf ("%s: exit(%d)\n", p_name, status);
+
 	thread_exit();
 }
 
@@ -232,10 +230,8 @@ int exec (const char *file){
 		exit(-1);
 	strlcpy(file_in_kernel, file, PGSIZE);
 	
-	if (process_exec(file_in_kernel) == -1){
-		free(file_in_kernel);
+	if (process_exec(file_in_kernel) == -1)
 		return -1;	
-	}
 }
 
 //자식 프로세스 tid가 끝날때까지 기다림 & 자식프로세스의 status를 반환함
@@ -268,7 +264,6 @@ bool remove (const char *file)
 		exit(-1);
 	lock_acquire(&filesys_lock);
 	bool success =  filesys_remove(file);
-	// palloc_free_page(file);
 	lock_release(&filesys_lock);
 
 	return success;
@@ -278,10 +273,7 @@ bool remove (const char *file)
 //fd반환
 int open (const char *file) 
 {
-	if (thread_current()->last_created_fd == 126){
-		exit(126);
-	}
-	if(!is_user_vaddr(file)|| pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL) 
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
 		exit(-1);
 	lock_acquire(&filesys_lock);
 	struct file *open_file = filesys_open(file);
@@ -308,11 +300,8 @@ void close (int fd) {
 		{
 			file_close(close_fd->file);
 			list_remove(&close_fd->fd_elem);
-			free(close_fd);
-			break;
 		}
 	}
-
 	return;
 }
 
@@ -431,16 +420,8 @@ int process_add_file(struct file *f)
 {
 	struct thread *curr = thread_current();
 	struct file_descriptor *new_fd = malloc(sizeof(struct file_descriptor));
-	// struct file_descriptor *test_fd = malloc(sizeof(struct file_descriptor));
 
 	// curr에 있는 fd_table의 fd를 확인하기 위한 작업
-	if (curr->last_created_fd >= 127){
-		free(new_fd);
-		return -1;
-	}
-
-	// struct file_descriptor *new_fd = malloc(sizeof(struct file_descriptor));
-
 	curr->last_created_fd += 1;
 	new_fd->fd = curr->last_created_fd;
 	new_fd->file = f;
