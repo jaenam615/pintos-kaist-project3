@@ -109,7 +109,7 @@ process_create_initd (const char *file_name) {
 	 */
 	//PROJECT 3 UPDATES
 	//fn_copy를 palloc_get_page(0)을 해야한다
-	fn_copy = palloc_get_page (0);
+	fn_copy = palloc_get_page (PAL_ZERO);
 	// fn_copy = palloc_get_page (PAL_USER);
 	if (fn_copy == NULL)
 		return TID_ERROR;
@@ -921,7 +921,6 @@ setup_stack (struct intr_frame *if_) {
 		if (vm_claim_page(stack_bottom)){
 			success = true; 
 			if_->rsp = USER_STACK;
-			thread_current()->stack_bottom = stack_bottom;
 		}
 	}
 	return success;
