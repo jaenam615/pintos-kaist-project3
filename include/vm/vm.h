@@ -2,7 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
-#include "include/lib/kernel/hash.h"
+#include "lib/kernel/hash.h"
 // #include "threads.h"
 
 struct lock page_lock;
@@ -87,13 +87,7 @@ struct page_operations {
 	enum vm_type type;
 };
 
-// IMPLEMENTATION
-struct lazy{
-	struct file *file;
-	off_t ofs;
-	size_t read_bytes;
-	size_t zero_bytes;
-};
+
 
 #define swap_in(page, v) (page)->operations->swap_in ((page), v)
 #define swap_out(page) (page)->operations->swap_out (page)

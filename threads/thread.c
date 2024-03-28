@@ -638,7 +638,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 #endif
 
 // #ifdef VM
-// 	supplemental_page_table_init(&t->spt);
+// 	list_init(&t->frame_list);
 // #endif
 
 	if (thread_mlfqs == true){
