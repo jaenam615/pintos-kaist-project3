@@ -369,11 +369,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		void * aux = src_p->uninit.aux;
 
 		if (src_p->uninit.type == VM_UNINIT){
-			final = vm_alloc_page_with_initializer(type, src_p->va, writable, init, NULL);
-		}else if (type == VM_ANON){
-			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, anon_initializer, aux);
-		} else if (type == VM_FILE) {
-			final = vm_alloc_page_with_initializer(type, dst_p, src_p->writable, file_backed_initializer, aux);
+			final = vm_alloc_page_with_initializer(type, dst_p, writable, init, NULL);
+		}else if (src_p->uninit.type == VM_ANON){
+			final = vm_alloc_page_with_initializer(type, dst_p, writable, anon_initializer, aux);
+		} else if (src_p->uninit.type == VM_FILE) {
+			final = vm_alloc_page_with_initializer(type, dst_p, writable, file_backed_initializer, aux);
 		}
 	}
 	return final; 
@@ -389,7 +389,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	// 	destructor = (hash_action_func *)page_table_kill;
 	// } 
 
-	//Destroy->Clear로 바꿔주었다. 
+	//Destroy->Clear로 바꿔주었더니 출력은 나온다 - 왜? 
 	// hash_destroy(&spt->spt_hash, page_table_kill);
 	hash_clear(&spt->spt_hash, page_table_kill);
 	

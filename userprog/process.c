@@ -107,7 +107,10 @@ process_create_initd (const char *file_name) {
 	 * FILE_NAME의 복사본을 만듭니다.
 	 * 그렇지 않으면 발신자와 load() 사이에 경합이 발생합니다.
 	 */
+	//PROJECT 3 UPDATES
+	//fn_copy를 palloc_get_page(0)을 해야한다
 	fn_copy = palloc_get_page (0);
+	// fn_copy = palloc_get_page (PAL_USER);
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
@@ -821,10 +824,6 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: VA is available when calling this function. */
 	
 	struct lazy *lazy = (struct lazy*)aux;
-	
-	// ASSERT ((lazy->read_bytes + lazy->zero_bytes) % PGSIZE == 0);
-	// ASSERT (pg_ofs (page->va) == 0);
-	// ASSERT (lazy->ofs % PGSIZE == 0);
 
 
 	//여기에서 오타가 있었나?
