@@ -120,8 +120,7 @@ struct thread {
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
 	// struct list frame_list;
-	void* stack_bottom;
-	void* rsp_stack;
+	void* stack_pointer;
 #endif
 
 	/* Owned by thread.c. */

@@ -239,7 +239,7 @@ vm_get_frame (void) {
 
 /* Growing the stack. */
 static void
-vm_stack_growth (void *addr UNUSED) {
+vm_stack_growth (void *addr) {
 }
 
 /* Handle the fault on write_protected page */
@@ -262,10 +262,15 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 	}
 
 	if(not_present){
-		struct thread* cur = thread_current();
+		struct thread* t = thread_current();
 		// lock_acquire(&page_lock);
 		page = spt_find_page(spt , addr);
 		// lock_release(&page_lock);
+		// t->stack_pointer = f->rsp;
+		// if (addr < t->stack_pointer){
+		// 	vm_stack_growth(addr);
+		// }
+
 		if(page == NULL){
 			// printf("page is null\n");
 			return false;
@@ -333,7 +338,10 @@ vm_do_claim_page (struct page *page) {
 	if (!pml4_set_page(t->pml4 , pg_round_down(page->va) , pg_round_down(frame->kva), page->writable)){
 		return false;
 	}
-
+	// if (pml4_get_page (t->pml4, page->va) != NULL
+	// 		|| !pml4_set_page (t->pml4, page->va, frame->kva, page->writable)){
+	// 			return false;
+	// 		}
 	return swap_in (page, frame->kva);
 }
 
@@ -368,11 +376,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		vm_initializer *init = src_p->uninit.init;
 		void * aux = src_p->uninit.aux;
 
-		if (src_p->uninit.type == VM_UNINIT){
+		if (VM_TYPE(type) == VM_UNINIT){
 			final = vm_alloc_page_with_initializer(type, dst_p, writable, init, NULL);
-		}else if (src_p->uninit.type == VM_ANON){
+		}else if (VM_TYPE(type) == VM_ANON){
 			final = vm_alloc_page_with_initializer(type, dst_p, writable, anon_initializer, aux);
-		} else if (src_p->uninit.type == VM_FILE) {
+		} else if (VM_TYPE(type) == VM_FILE) {
 			final = vm_alloc_page_with_initializer(type, dst_p, writable, file_backed_initializer, aux);
 		}
 	}
