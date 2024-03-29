@@ -240,6 +240,10 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr) {
+	//할당 해주고, 스택 포인터를 아래로 addr만큼 낮추어라
+	if (vm_alloc_page_with_initializer(VM_ANON, addr, true, NULL, NULL)){
+		thread_current()->stack_pointer = addr;
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -261,15 +265,21 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		return false;
 	}
 
+
 	if(not_present){
 		struct thread* t = thread_current();
 		// lock_acquire(&page_lock);
+		
+		void* ptr = (user) ? f->rsp : thread_current()->stack_pointer;
+		
+		//스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 + USER STACK스택 영역이면
+		if (ptr-sizeof(void*) <= addr && addr <= USER_STACK-PGSIZE && addr > 0x400000 + sizeof(void*)){
+			vm_stack_growth(pg_round_down(addr));
+		}
+		
+		
 		page = spt_find_page(spt , addr);
 		// lock_release(&page_lock);
-		// t->stack_pointer = f->rsp;
-		// if (addr < t->stack_pointer){
-		// 	vm_stack_growth(addr);
-		// }
 
 		if(page == NULL){
 			// printf("page is null\n");
@@ -368,7 +378,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 	while (hash_next (&i))
 	{
 		struct page *src_p = hash_entry (hash_cur (&i), struct page, hash_elem);
-		struct page *dst_p = (struct page*)malloc(PGSIZE);
+		struct page *dst_p = (struct page*)malloc(sizeof(struct page));
 
 		//복사할 것들 - vm_alloc_page_with_initializer가 받는 인자들 부모로부터 복사
 		enum vm_type type = page_get_type(src_p);
@@ -377,11 +387,21 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		void * aux = src_p->uninit.aux;
 
 		if (VM_TYPE(type) == VM_UNINIT){
-			final = vm_alloc_page_with_initializer(type, dst_p, writable, init, NULL);
+			final = vm_alloc_page_with_initializer(type, src_p->va, writable, init, NULL);
 		}else if (VM_TYPE(type) == VM_ANON){
-			final = vm_alloc_page_with_initializer(type, dst_p, writable, anon_initializer, aux);
+			if(vm_alloc_page_with_initializer(type, src_p->va, writable, NULL, NULL))
+				if(vm_claim_page(src_p->va)){
+					final = true;
+				}
+				memcpy(src_p, dst_p, PGSIZE);
+				spt_insert_page(dst, dst_p);
 		} else if (VM_TYPE(type) == VM_FILE) {
-			final = vm_alloc_page_with_initializer(type, dst_p, writable, file_backed_initializer, aux);
+			if(vm_alloc_page_with_initializer(type, src_p->va, writable, NULL, NULL))
+				if(vm_claim_page(src_p->va)){
+					final = true;
+				}
+				memcpy(src_p, dst_p, PGSIZE);
+				spt_insert_page(dst, dst_p);
 		}
 	}
 	return final; 
@@ -398,6 +418,8 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	// } 
 
 	//Destroy->Clear로 바꿔주었더니 출력은 나온다 - 왜? 
+	//hash_destroy->hash_clear->list_pop_front->list_remove를 타고
+	//list_remove(): assertion `is_interior (elem)' failed.라는 패닉이 뜬다.
 	// hash_destroy(&spt->spt_hash, page_table_kill);
 	hash_clear(&spt->spt_hash, page_table_kill);
 	

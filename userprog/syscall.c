@@ -111,6 +111,9 @@ syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 
 	struct thread *t = thread_current();
+	//페이지 폴트가 커널에서 발생할 경우 intr_frame에서 프로그램의 스택 포인터를 가져오지 못한다
+	//초기 커널모드로 전환할 때 스택 포인터를 쓰레드 구조체에 저장해준다.
+	t->stack_pointer = f->rsp;
 	t->tf = *f;
 
 	// int size = palloc_init();
