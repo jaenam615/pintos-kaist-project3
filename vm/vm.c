@@ -365,48 +365,84 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 }
 
 /* Copy supplemental page table from src to dst */
-bool
-supplemental_page_table_copy (struct supplemental_page_table *dst,
-		struct supplemental_page_table *src) {
+// bool
+// supplemental_page_table_copy (struct supplemental_page_table *dst,
+// 		struct supplemental_page_table *src) {
 	
-	//IMPLEMENTATION
-	//get first entry
+// 	//IMPLEMENTATION
+// 	//get first entry
+// 	struct hash_iterator i;
+// 	hash_first(&i, &src->spt_hash);
+// 	bool final = false;
+// 	//iterate through entries and copy them 
+// 	while (hash_next (&i))
+// 	{
+// 		struct page *src_p = hash_entry (hash_cur (&i), struct page, hash_elem);
+// 		struct page *dst_p;
+
+// 		//복사할 것들 - vm_alloc_page_with_initializer가 받는 인자들 부모로부터 복사
+// 		enum vm_type type = page_get_type(src_p);
+// 		bool writable = src_p->writable;
+// 		vm_initializer *init = src_p->uninit.init;
+// 		void * aux = src_p->uninit.aux;
+
+// 		if (VM_TYPE(type) == VM_UNINIT){
+// 			final = vm_alloc_page_with_initializer(type, src_p->va, writable, init, aux);
+// 		}else {
+// 			if(vm_alloc_page_with_initializer(type, src_p->va, writable, init, aux)){
+// 				if(vm_claim_page(src_p->va)){
+// 					memcpy(src_p, dst_p, PGSIZE);
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return final; 
+// }
+bool supplemental_page_table_copy(struct supplemental_page_table *dst,
+		struct supplemental_page_table *src) {
 	struct hash_iterator i;
+
 	hash_first(&i, &src->spt_hash);
-	bool final = false;
-	//iterate through entries and copy them 
-	while (hash_next (&i))
-	{
-		struct page *src_p = hash_entry (hash_cur (&i), struct page, hash_elem);
-		struct page *dst_p = (struct page*)malloc(sizeof(struct page));
-
-		//복사할 것들 - vm_alloc_page_with_initializer가 받는 인자들 부모로부터 복사
-		enum vm_type type = page_get_type(src_p);
-		bool writable = src_p->writable;
-		vm_initializer *init = src_p->uninit.init;
-		void * aux = src_p->uninit.aux;
-
-		if (VM_TYPE(type) == VM_UNINIT){
-			final = vm_alloc_page_with_initializer(type, src_p->va, writable, init, NULL);
-		}else if (VM_TYPE(type) == VM_ANON){
-			if(vm_alloc_page_with_initializer(type, src_p->va, writable, NULL, NULL))
-				if(vm_claim_page(src_p->va)){
-					final = true;
+	while (hash_next(&i)) {
+		struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
+		struct page *dst_page = NULL;
+		// struct page *dst_page = palloc_get_page(PAL_USER);
+		if (src_page->frame == NULL) {
+			if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux)) {
+				return false;
+			}
+		}
+		else {
+			enum vm_type src_type = page_get_type(src_page);
+			switch (src_type)
+			{
+			case VM_ANON:
+				// if (!vm_alloc_page(VM_ANON, src_page->va, src_page->writable)) {
+				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux)) {
+					return false;
 				}
-				memcpy(src_p, dst_p, PGSIZE);
-				spt_insert_page(dst, dst_p);
-		} else if (VM_TYPE(type) == VM_FILE) {
-			if(vm_alloc_page_with_initializer(type, src_p->va, writable, NULL, NULL))
-				if(vm_claim_page(src_p->va)){
-					final = true;
+				if (!vm_claim_page(src_page->va)) {
+					return false;
 				}
-				memcpy(src_p, dst_p, PGSIZE);
-				spt_insert_page(dst, dst_p);
+				break;
+			case VM_FILE:
+				// if (!vm_alloc_page(VM_ANON, src_page->va, src_page->writable)) {
+				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux)) {
+					return false;
+				}
+				if (!vm_claim_page(src_page->va)) {
+					return false;
+				}
+				break;
+			default:
+				break;
+			}
+			dst_page = spt_find_page(dst, src_page->va);
+			memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 		}
 	}
-	return final; 
+	return true;
 }
-
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt) {
