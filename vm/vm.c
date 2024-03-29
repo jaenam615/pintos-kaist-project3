@@ -44,6 +44,7 @@ static struct frame *vm_evict_frame (void);
 static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
 static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
 struct list frame_table; // TODO: frame table 초기화 해주어야 함
+void hash_free (struct hash_elem *e, void *aux);
 
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
@@ -77,20 +78,23 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
         /* 페이지를 spt에 삽입하라 */
         struct page *p;
-        p = palloc_get_page(PAL_USER);
+        bool (*initializer)(struct page *, enum vm_type, void *);
+        p = (struct page *)malloc(sizeof(struct page));
         if (p == NULL)
             return false;
         switch (type)
         {
         case VM_ANON:
-            uninit_new(p, upage, init, type, aux, anon_initializer);
+            initializer = anon_initializer;
             break;
         case VM_FILE:
-            uninit_new(p, upage, init, type, aux, file_backed_initializer);
+            initializer = file_backed_initializer;
             break;
         default:
             return false;
         }
+        uninit_new(p, upage, init, type, aux, initializer);
+        p->writable = writable;
         spt_insert_page(spt, p);
 	}
 err:
@@ -201,14 +205,31 @@ vm_handle_wp (struct page *page UNUSED) {
 
 /* Return true on success */
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+vm_try_handle_fault (struct intr_frame *f, void *addr,
+		bool user, bool write, bool not_present) {
+	struct supplemental_page_table *spt = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
-	/* TODO: Your code goes here */
-
-	return vm_do_claim_page (page);
+	// implementation - pongpongie
+    // printf("not present: %d, write : %d \n", write, not_present);
+    if (not_present == 1 && write == 1){
+        // printf("aaaaaaaa \n");
+        page = spt_find_page(&spt, addr);
+        // printf("writable &d\n", &page->writable);
+        if (page->writable == 1)
+        {
+            return vm_do_claim_page (page);
+        }
+        if (page->writable == 0)
+        {
+            return false;
+        }
+    }
+    if (not_present == 1 && write == 0){
+        page = spt_find_page(spt, addr);
+        return vm_do_claim_page(page);
+    }
+    return false;
 }
 
 /* Free the page.
@@ -277,17 +298,17 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 
         if (page_get_type(page) == VM_FILE)
         {
-            new_page->va = palloc_get_page(PAl_USER);
+            new_page->va = palloc_get_page(PAL_USER);
             vm_alloc_page(VM_FILE, &new_page->va, true);
 
         }
         if (page_get_type(page) == VM_ANON)
         {
-            new_page->va = palloc_get_page(PAl_USER);
+            new_page->va = palloc_get_page(PAL_USER);
             vm_alloc_page(VM_ANON, &new_page->va, true);
         }
         else {
-            new_page = palloc_get_page(PAl_USER);
+            new_page = palloc_get_page(PAL_USER);
             page->writable = new_page->writable;
             page->uninit.init = new_page->uninit.init;
             page->uninit.type = new_page->uninit.type;
@@ -309,9 +330,10 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 }
 
 /* implementation - pongpongie */
-
-hash_action_func hash_free (struct hash_elem *e, void *aux){
-    
+void hash_free (struct hash_elem *e, void *aux){
+    const struct page *page = hash_entry(e, struct page, hash_elem);
+    destroy(page);
+    free(page);
 }
 
 unsigned

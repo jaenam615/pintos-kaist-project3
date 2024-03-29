@@ -95,7 +95,7 @@ struct supplemental_page_table {
 };
 
 // implementation - pongpongie
-struct aux {
+struct lazy_aux {
     struct file *file;
     off_t ofs;
     uint32_t read_bytes; 
