@@ -429,8 +429,8 @@ process_cleanup (void) {
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
+	// free(&curr->spt.spt_hash.buckets);
 #endif
-
 	uint64_t *pml4;
 	/* Destroy the current process's page directory and switch back
 	 * to the kernel-only page directory. */
@@ -831,13 +831,13 @@ lazy_load_segment (struct page *page, void *aux) {
 	file_seek(lazy->file, lazy->ofs);
 	//file에서 read_bytes만큼 buf로 read한다
 	/* Load this page. */
-	lock_try_acquire(&filesys_lock);
+	// lock_try_acquire(&filesys_lock);
 	if(file_read(lazy->file, page->frame->kva, lazy->read_bytes) != (int) lazy->read_bytes){
 		palloc_free_page(page->frame->kva);	
 		return false;
 		
 	}
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 	//read_bytes로 설정한 이후 부분부터 zero_bytes만큼 0으로 채운다
 	void* start;
 	start = page->frame->kva + lazy->read_bytes;
