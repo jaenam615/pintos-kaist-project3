@@ -835,6 +835,7 @@ lazy_load_segment (struct page *page, void *aux) {
 	if(file_read(lazy->file, page->frame->kva, lazy->read_bytes) != (int) lazy->read_bytes){
 		palloc_free_page(page->frame->kva);	
 		return false;
+		
 	}
 	lock_release(&filesys_lock);
 	//read_bytes로 설정한 이후 부분부터 zero_bytes만큼 0으로 채운다
