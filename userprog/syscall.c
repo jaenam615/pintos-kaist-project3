@@ -237,9 +237,12 @@ tid_t fork (const char *thread_name, struct intr_frame *f){
 //현재 프로세스를 file로 바꿈
 int exec (const char *file){
 	
-	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
+#ifndef VM
+	if(pml4_get_page(thread_current()->pml4, file) == NULL) 
 		exit(-1);
-
+#endif
+	if(file == NULL || !is_user_vaddr(file) || *file == '\0') 
+		exit(-1);
 	char* file_in_kernel;
 	file_in_kernel = palloc_get_page(PAL_ZERO);
 
@@ -263,9 +266,13 @@ int wait (tid_t t)
 bool create (const char *file, unsigned initial_size) 
 {
 	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
-	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
+#ifndef VM
+	if(pml4_get_page(thread_current()->pml4, file) == NULL) 
 		exit(-1);
-	
+#endif
+	if(file == NULL || !is_user_vaddr(file) || *file == '\0') 
+		exit(-1);
+
 	lock_acquire(&filesys_lock);
 	bool success = filesys_create(file, initial_size);
 	lock_release(&filesys_lock);
@@ -277,8 +284,13 @@ bool create (const char *file, unsigned initial_size)
 bool remove (const char *file)
 {
 	//가상메모리 주소에 해당하는 물리메모리 주소를 확인하고, 커널의 가상메모리 주소를 반환함
-	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file) || *file == '\0') 
+#ifndef VM
+	if(pml4_get_page(thread_current()->pml4, file) == NULL) 
 		exit(-1);
+#endif
+	if(file == NULL || !is_user_vaddr(file) || *file == '\0') 
+		exit(-1);
+
 	lock_acquire(&filesys_lock);
 	bool success =  filesys_remove(file);
 	lock_release(&filesys_lock);
@@ -290,8 +302,13 @@ bool remove (const char *file)
 //fd반환
 int open (const char *file) 
 {
-	if(pml4_get_page(thread_current()->pml4, file) == NULL || file == NULL || !is_user_vaddr(file)) 
+#ifndef VM
+	if(pml4_get_page(thread_current()->pml4, file) == NULL || *file == '\0') 
 		exit(-1);
+#endif
+	if(file == NULL || !is_user_vaddr(file)) 
+		exit(-1);
+
 	lock_acquire(&filesys_lock);
 	struct file *open_file = filesys_open(file);
 	int fd = -1;
@@ -332,9 +349,13 @@ int filesize (int fd)
 
 int read (int fd, void *buffer, unsigned size)
 {
-	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
+#ifndef VM
+	if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
 		exit(-1);
-
+#endif
+	if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
+		exit(-1);
+	
 	struct thread *curr = thread_current();
 	struct list_elem *start;
 	off_t buff_size;
@@ -366,7 +387,12 @@ int read (int fd, void *buffer, unsigned size)
 
 int write (int fd, const void *buffer, unsigned size)
 {
-	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
+
+#ifndef VM
+	if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
+		exit(-1);
+#endif
+	if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
 		exit(-1);
 
 	struct thread *curr = thread_current();
@@ -453,7 +479,7 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	//fd 식별자로 파일 디스크립터를 찾는다
 	struct file_descriptor *mmap_fd= find_file_descriptor(fd);
 	//찾은 파일 디스크립터 구조체의 파일을 do_mmap함수의 인자로 전달
-	do_mmap(addr, length, writable, mmap_fd->file, offset);
+	return do_mmap(addr, length, writable, mmap_fd->file, offset);
 }
 
 void
