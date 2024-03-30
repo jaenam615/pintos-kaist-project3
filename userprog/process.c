@@ -884,7 +884,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		aux->file = file;
 		aux->ofs = ofs;
 		aux->read_bytes = page_read_bytes;
-		aux->zero_bytes = page_read_bytes;
+		aux->zero_bytes = page_zero_bytes;
 
 		//실패시 메모리 반환 및 false반환
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
