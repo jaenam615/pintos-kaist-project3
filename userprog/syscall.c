@@ -17,6 +17,10 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
+//#ifdef VM
+#include "vm/vm.h"
+#include "vm/file.h"
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void halt (void);
@@ -33,7 +37,8 @@ int write (int fd, const void *buffer, unsigned length);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
 int insert_file_fdt(struct file *file);
 int process_add_file(struct file *f); 
 struct file_descriptor *find_file_descriptor(int fd);
@@ -193,6 +198,14 @@ syscall_handler (struct intr_frame *f) {
 
 	case SYS_CLOSE:
 		close(f->R.rdi);
+		break;
+
+	case SYS_MMAP:
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r9);
+		break;
+
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
 		break;
 
 	default:
@@ -420,11 +433,41 @@ unsigned tell (int fd)
 
 }
 
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+
+	
+	// 주소와 길이 유효성 검사
+	if (addr == 0 || length <= 0){
+		return NULL;
+	}
+	// 표준입출력 fd일 경우 실패
+	if (fd == 0 || fd == 1){
+		return NULL;
+	}
+
+	if (length%PGSIZE != 0){
+
+	}
+
+	//fd 식별자로 파일 디스크립터를 찾는다
+	struct file_descriptor *mmap_fd= find_file_descriptor(fd);
+	//찾은 파일 디스크립터 구조체의 파일을 do_mmap함수의 인자로 전달
+	do_mmap(addr, length, writable, mmap_fd->file, offset);
+}
+
+void
+munmap (void *addr) {
+	do_munmap(addr);
+}
+
 int process_add_file(struct file *f)
 {
 	struct thread *curr = thread_current();
 	struct file_descriptor *new_fd = malloc(sizeof(struct file_descriptor));
-
+	if(new_fd == NULL){
+		free(new_fd);
+	}
 	// curr에 있는 fd_table의 fd를 확인하기 위한 작업
 	curr->last_created_fd += 1;
 	new_fd->fd = curr->last_created_fd;

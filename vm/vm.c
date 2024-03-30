@@ -10,7 +10,6 @@
 #include "userprog/process.h"
 #include "threads/vaddr.h"
 
-
 void page_table_kill(struct hash_elem *h, void* aux UNUSED);
 static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
 static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
@@ -418,7 +417,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 			{
 			case VM_ANON:
 				// if (!vm_alloc_page(VM_ANON, src_page->va, src_page->writable)) {
-				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux)) {
+				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, NULL, NULL)) {
 					return false;
 				}
 				if (!vm_claim_page(src_page->va)) {
@@ -427,7 +426,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 				break;
 			case VM_FILE:
 				// if (!vm_alloc_page(VM_ANON, src_page->va, src_page->writable)) {
-				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux)) {
+				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, NULL, NULL)) {
 					return false;
 				}
 				if (!vm_claim_page(src_page->va)) {
