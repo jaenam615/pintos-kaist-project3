@@ -196,6 +196,7 @@ vm_get_frame (void) {
         return frame;
         // PANIC("todo");
     }
+
     list_push_back(&frame_table, &frame->frame_elem);  // 프레임 테이블에 프레임 추가
     frame->page = NULL;
     
@@ -345,15 +346,10 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	 * TODO: writeback all the modified contents to the storage. */
 
     // implementation - pongpongie
-    hash_destroy(&spt->spt_hash, hash_free);
+    hash_clear(&spt->spt_hash, page_table_kill);
 }
 
 /* implementation - pongpongie */
-void hash_free (struct hash_elem *e, void *aux){
-    const struct page *page = hash_entry(e, struct page, hash_elem);
-    destroy(page);
-    free(page);
-}
 
 void page_table_kill(struct hash_elem *h, void* aux UNUSED){
 	const struct page *_page = hash_entry(h, struct page, hash_elem);
