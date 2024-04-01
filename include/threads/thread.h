@@ -123,6 +123,7 @@ struct thread {
 
 #endif
 	void* stack_pointer;
+	void* stack_bottom; 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */

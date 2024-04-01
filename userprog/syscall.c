@@ -20,6 +20,7 @@
 //#ifdef VM
 #include "vm/vm.h"
 #include "vm/file.h"
+//endif
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -86,6 +87,24 @@ struct file_descriptor *find_file_descriptor(int fd) {
 	return NULL;
 }
 
+void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write){
+	if (buffer <= USER_STACK && buffer >= rsp)
+		return;
+	
+	for(int i=0; i<size; i++){
+		if(buffer+i == NULL || is_kernel_vaddr(buffer+i)){
+			exit(-1);
+		} else {
+        	struct page* page = spt_find_page(&thread_current()->spt, buffer + i);
+			if(page == NULL)
+            	exit(-1);
+        	if(to_write == true && page->writable == false)
+            	exit(-1);
+		}
+
+    }
+}
+
 /* An open file. */
 struct file {
 	struct inode *inode;        /* File's inode. */
@@ -135,8 +154,8 @@ syscall_handler (struct intr_frame *f) {
 		thread_exit();
 	}
 	
-	int addr = (f->rsp + 8);
-	if (!is_user_vaddr(addr) || (addr > KERN_BASE || addr<0)) {
+	int addr = (f->rsp);
+	if (!is_user_vaddr(addr) || !is_user_vaddr(pg_round_up(addr)) ||  (addr > KERN_BASE || addr<0)) {
 		printf ("third condition\n");
 		thread_exit();
 	}
@@ -181,10 +200,12 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_READ:
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
 		f->R.rax = read(f->R.rdi,f->R.rsi,f->R.rdx);
 		break;
 
 	case SYS_WRITE:
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
 		f->R.rax = write(f->R.rdi,f->R.rsi,f->R.rdx);
 		break;
 
@@ -200,8 +221,9 @@ syscall_handler (struct intr_frame *f) {
 		close(f->R.rdi);
 		break;
 
+	// r10다음에 r9가 아니라 r8이다!
 	case SYS_MMAP:
-		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r9);
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 		break;
 
 	case SYS_MUNMAP:
@@ -243,6 +265,7 @@ int exec (const char *file){
 #endif
 	if(file == NULL || !is_user_vaddr(file) || *file == '\0') 
 		exit(-1);
+
 	char* file_in_kernel;
 	file_in_kernel = palloc_get_page(PAL_ZERO);
 
@@ -462,22 +485,37 @@ unsigned tell (int fd)
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 
-	
-	// 주소와 길이 유효성 검사
-	if (addr == 0 || length <= 0){
+	// 주소 유효성 검사
+	if(addr == 0 || addr == NULL) 
+		return NULL;	
+
+	if(offset%PGSIZE != 0){
+		return NULL; 
+	}
+	if (spt_find_page(&thread_current()->spt, addr) != NULL){
 		return NULL;
 	}
-	// 표준입출력 fd일 경우 실패
+
+	if(!is_user_vaddr(pg_round_down(addr)) || !is_user_vaddr(pg_round_up(addr))){
+		return NULL;
+	}
+
+	if (pml4_get_page(thread_current()->pml4, pg_round_down(addr)) || pml4_get_page(thread_current()->pml4, pg_round_up(addr)))
+		return NULL;
+	// 읽고자 하는 길이 유효성 검사 & 주소를 가지고 있는 페이지가 SPT에 전재하는지 확인(유효한 페이지인가)
+	if (length <= 0){
+		return NULL;
+	}
+	// 표준입출력 FD가 아닌것을 확인
 	if (fd == 0 || fd == 1){
-		return NULL;
+		exit(-1);
 	}
-
-	if (length%PGSIZE != 0){
-
-	}
-
 	//fd 식별자로 파일 디스크립터를 찾는다
 	struct file_descriptor *mmap_fd= find_file_descriptor(fd);
+	if (mmap_fd == NULL){
+		return NULL;
+	}
+
 	//찾은 파일 디스크립터 구조체의 파일을 do_mmap함수의 인자로 전달
 	return do_mmap(addr, length, writable, mmap_fd->file, offset);
 }
