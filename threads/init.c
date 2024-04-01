@@ -107,6 +107,7 @@ main (void) {
 
 #ifdef FILESYS
 	/* Initialize file system. */
+	
 	disk_init ();
 	filesys_init (format_filesys);
 #endif

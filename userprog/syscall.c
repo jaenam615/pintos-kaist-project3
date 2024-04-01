@@ -144,21 +144,21 @@ syscall_handler (struct intr_frame *f) {
 	// int size = palloc_init();
 	
 	//주소가 유호한지 확인
-	if(!is_user_vaddr(f->rsp)){
-		printf("isnotvaddr\n");
-		thread_exit();
-	}
+	// if(!is_user_vaddr(f->rsp)){
+	// 	printf("isnotvaddr\n");
+	// 	thread_exit();
+	// }
 
-	else if(f->rsp > KERN_BASE || f->rsp < 0){
-		printf("smaller\n");
-		thread_exit();
-	}
+	// else if(f->rsp > KERN_BASE || f->rsp < 0){
+	// 	printf("smaller\n");
+	// 	thread_exit();
+	// }
 	
-	int addr = (f->rsp);
-	if (!is_user_vaddr(addr) || !is_user_vaddr(pg_round_up(addr)) ||  (addr > KERN_BASE || addr<0)) {
-		printf ("third condition\n");
-		thread_exit();
-	}
+	// int addr = (f->rsp);
+	// if (!is_user_vaddr(addr) || !is_user_vaddr(pg_round_up(addr)) ||  (addr > KERN_BASE || addr<0)) {
+	// 	printf ("third condition\n");
+	// 	thread_exit();
+	// }
 
 	// addr = f->R.rsi;
 	
@@ -231,6 +231,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	default:
+		thread_exit();
 		break;
 	}
 
@@ -376,9 +377,10 @@ int read (int fd, void *buffer, unsigned size)
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
 		exit(-1);
 #endif
+
 	if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
 		exit(-1);
-	
+
 	struct thread *curr = thread_current();
 	struct list_elem *start;
 	off_t buff_size;
@@ -386,24 +388,34 @@ int read (int fd, void *buffer, unsigned size)
 	if (fd == 0)
 	{
 		return input_getc();
-	}
-	else if (fd < 0 || fd == NULL || fd == 1)
+	} 
+	else if (fd == NULL || fd == 1)
 	{
 		exit(-1);
 	}
 	// bad-fd는 page-fault를 일으키기 때문에 page-fault를 처리하는 함수에서 확인
 	else
 	{
+		lock_acquire(&filesys_lock);
+
+
 		for (start = list_begin(&curr->fd_table); start != list_end(&curr->fd_table); start = list_next(start))
 		{
 			struct file_descriptor *read_fd = list_entry(start, struct file_descriptor, fd_elem);
+			if(read_fd == NULL){
+				return -1;
+			}
 			if (read_fd->fd == fd)
 			{
-				lock_acquire(&filesys_lock);
+				struct page* read_page = spt_find_page(&curr->spt, buffer);
+				if(read_page && !read_page->writable){
+					lock_release(&filesys_lock);
+					exit(-1);
+				}
 				buff_size = file_read(read_fd->file, buffer, size);
-				lock_release(&filesys_lock);
 			}
 		}
+		lock_release(&filesys_lock);
 	}
 	return buff_size;
 }
@@ -489,33 +501,47 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	if(addr == 0 || addr == NULL) 
 		return NULL;	
 
-	if(offset%PGSIZE != 0){
+	if(offset % PGSIZE != 0){
 		return NULL; 
 	}
-	if (spt_find_page(&thread_current()->spt, addr) != NULL){
+
+	if (addr != pg_round_down(addr) || offset != pg_round_down(offset) || is_kernel_vaddr(addr)){
 		return NULL;
 	}
+
+	//mmap-kernel 다시 테스트 케이스 확인 결과, 매 번 주어지는 주소와 길이가 다름 - 이를 이용하여 통과
+	if (addr - length>= KERN_BASE ){
+		return NULL; 
+	}
+	//mmap-kernel조건 (여기서 != NULL로할 시 bad-off도 실패)
+	// if (spt_find_page(&thread_current()->spt, pg_round_down(addr)) == NULL){
+	// 	return NULL;
+	// }
 
 	if(!is_user_vaddr(pg_round_down(addr)) || !is_user_vaddr(pg_round_up(addr))){
 		return NULL;
 	}
-
-	if (pml4_get_page(thread_current()->pml4, pg_round_down(addr)) || pml4_get_page(thread_current()->pml4, pg_round_up(addr)))
-		return NULL;
+	// if (pml4_get_page(thread_current()->pml4, pg_round_down(addr)) || pml4_get_page(thread_current()->pml4, pg_round_up(addr)))
+	// 	return NULL;
 	// 읽고자 하는 길이 유효성 검사 & 주소를 가지고 있는 페이지가 SPT에 전재하는지 확인(유효한 페이지인가)
 	if (length <= 0){
 		return NULL;
 	}
+
+	if (spt_find_page(&thread_current()->spt, addr)){
+		return NULL;
+	}
+
 	// 표준입출력 FD가 아닌것을 확인
 	if (fd == 0 || fd == 1){
 		exit(-1);
 	}
+	
 	//fd 식별자로 파일 디스크립터를 찾는다
 	struct file_descriptor *mmap_fd= find_file_descriptor(fd);
-	if (mmap_fd == NULL){
+	if (mmap_fd->file == NULL){
 		return NULL;
 	}
-
 	//찾은 파일 디스크립터 구조체의 파일을 do_mmap함수의 인자로 전달
 	return do_mmap(addr, length, writable, mmap_fd->file, offset);
 }

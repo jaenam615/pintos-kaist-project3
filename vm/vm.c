@@ -61,7 +61,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
-
+;
 
 	/* Check wheter the upage is already occupied or not. */
 	//upage라는 주소를 갖는 페이지는 존재하지 않아야 한다 - 여기서 upage는 새로 만들 페이지의 user virtual address이다
@@ -216,6 +216,8 @@ vm_get_frame (void) {
 	//실패 시에는 SWAP을 해야하기 때문에 evict frame으로 일단 넣어둔다
 	if (frame->kva == NULL){	
 		// PANIC("todo");
+		palloc_free_page(frame->kva);
+		free(frame);
 		frame = vm_evict_frame();
 		frame->page = NULL;
 		return frame;
@@ -240,10 +242,10 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr) {
 	//할당 해주고, 스택 포인터를 아래로 addr만큼 낮추어라
-	if (vm_alloc_page_with_initializer(VM_ANON, addr, true, NULL, NULL)){
+	if (vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, addr, true, NULL, NULL)){
 		thread_current()->stack_pointer = addr;
 		//확인해야함
-		// thread_current()->stack_bottom -= PGSIZE;
+		thread_current()->stack_bottom -= PGSIZE;
 	}
 }
 
@@ -270,11 +272,8 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		struct thread* t = thread_current();
 		// lock_acquire(&page_lock);
 		
-		void* ptr;
-		
-		if (user) {
-			ptr = f->rsp;
-		} else {
+		void* ptr = f->rsp;
+		if (!user){
 			ptr = t->stack_pointer;
 		}
 		// //확인해야함
@@ -286,11 +285,19 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 	
 
 		//스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 + USER STACK스택 영역이면
-		if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
-			vm_stack_growth(pg_round_down(addr));
+		// if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
+		// 	vm_stack_growth(pg_round_down(addr));
+		// }
+	    // if (USER_STACK - (1 << 20) <= ptr - 8 && ptr - 8 == addr && addr <= USER_STACK)
+        //     vm_stack_growth(addr);
+        // else if (USER_STACK - (1 << 20) <= ptr && ptr <= addr && addr <= USER_STACK)
+        //     vm_stack_growth(addr);		
+
+		if ( (USER_STACK - (1 << 20) <= ptr - sizeof(void*) && ptr - sizeof(void*) == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= ptr && ptr <= addr && addr <= USER_STACK)){
+			// if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
+				vm_stack_growth(pg_round_down(addr));	
+			// }
 		}
-		
-		
 		page = spt_find_page(spt , addr);
 		// lock_release(&page_lock);
 
@@ -446,7 +453,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 				file_lazy->ofs = src_page->file.ofs;
 				file_lazy->read_bytes = src_page->file.read_bytes;
 				file_lazy->zero_bytes = src_page->file.zero_bytes;
-				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, lazy_load_segment_for_file, file_lazy)) {
+				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, lazy_load_segment, file_lazy)) {
 					return false;
 				}
 				if (!vm_claim_page(src_page->va)) {

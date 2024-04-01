@@ -114,7 +114,6 @@ struct thread {
 	// struct list fd_table;
 	// unsigned last_created_fd;
 
-
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -136,7 +135,7 @@ struct thread {
 	int exit_status; 
 	struct intr_frame parent_tf;
 	// struct file **descriptor_table;
-	int fd_idx;
+	// int fd_idx;
 
 	struct file *running;
 	/* 자식 프로세스의 fork가 완료될 때까지 기다리도록 하기 위한 세마포어 */
