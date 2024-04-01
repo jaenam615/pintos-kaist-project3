@@ -163,9 +163,12 @@ vm_evict_frame (void) {
 
 	/* TODO: swap out the victim and return the evicted frame. */
     // implementation - pongpongie
-    if (swap_out(victim->page) == true);
+    if (!list_empty(&frame_table))
     {
-        return victim;
+        if (swap_out(victim->page) == true);
+        {
+            return victim;
+        }    
     }
 	return NULL;
 }
@@ -308,34 +311,38 @@ supplemental_page_table_init (struct supplemental_page_table *spt /* UNUSED */) 
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst,
     struct supplemental_page_table *src) {
+    
     // implementation - pongpongie
-
     struct hash_iterator i; // *i 아닌 그냥 i
     hash_first (&i, &src->spt_hash);
     while (hash_next (&i))
     { 
         struct page *src_page = hash_entry (hash_cur (&i), struct page, hash_elem);
-        void *dummy_page;
-        dummy_page = src_page->va;
+        enum vm_type src_type = src_page->operations->type; // page_get_type 왜 안될까? - 현재 페이지의 타입이 아닌 초기화 되고 난 후의 타입을 반환하기 때문인듯.
+        // enum vm_type src_type = page_get_type(src_page);
+        // printf("page get : %d \n\n", page_get_type(src_page));
 
-        if (page_get_type(src_page) != VM_UNINIT)
-        {             
-            if (vm_alloc_page(page_get_type(src_page), dummy_page, src_page->writable) == false)
-            {
-                return false;
-            }
-            if (vm_claim_page(dummy_page) == false)
-            {
-                return false;
-            }
-            struct page *dst_page = spt_find_page(dst, dummy_page);
-            memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+        // printf("type = %d \n\n", src_page->operations->type);
+        bool src_writable = src_page->writable;
+        void *upage_va = src_page->va;
+        
+        if (src_type == VM_UNINIT)
+        {
+            vm_initializer *src_init = src_page->uninit.init;
+            void *src_aux = src_page->uninit.aux;
+            vm_alloc_page_with_initializer(VM_ANON, upage_va, src_writable, src_init, src_aux);
             continue;
-        }    
-        if (vm_alloc_page_with_initializer(VM_ANON, dummy_page, src_page->writable, src_page->uninit.init, src_page->uninit.aux) == false)
+        }
+        if (!vm_alloc_page(src_type, upage_va, src_writable))
         {
             return false;
         }
+        if (!vm_claim_page(upage_va))
+        {
+            return false;
+        }
+        struct page *dst_page = spt_find_page(dst, upage_va);
+        memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
     }
     return true;
 }
