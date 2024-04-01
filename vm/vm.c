@@ -310,34 +310,34 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
     struct supplemental_page_table *src) {
     // implementation - pongpongie
 
-    struct hash_iterator *i;
-    struct page *new_page;
+    struct hash_iterator i; // *i 아닌 그냥 i
     hash_first (&i, &src->spt_hash);
     while (hash_next (&i))
-    {
-        struct page *page = hash_entry (hash_cur (&i), struct page, hash_elem);
+    { 
+        struct page *src_page = hash_entry (hash_cur (&i), struct page, hash_elem);
+        void *dummy_page;
+        dummy_page = src_page->va;
 
-        if (page_get_type(page) == VM_FILE)
+        if (page_get_type(src_page) != VM_UNINIT)
+        {             
+            if (vm_alloc_page(page_get_type(src_page), dummy_page, src_page->writable) == false)
+            {
+                return false;
+            }
+            if (vm_claim_page(dummy_page) == false)
+            {
+                return false;
+            }
+            struct page *dst_page = spt_find_page(dst, dummy_page);
+            memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+            continue;
+        }    
+        if (vm_alloc_page_with_initializer(VM_ANON, dummy_page, src_page->writable, src_page->uninit.init, src_page->uninit.aux) == false)
         {
-            new_page->va = palloc_get_page(PAL_USER);
-            vm_alloc_page(VM_FILE, &new_page->va, true);
-
+            return false;
         }
-        if (page_get_type(page) == VM_ANON)
-        {
-            new_page->va = palloc_get_page(PAL_USER);
-            vm_alloc_page(VM_ANON, &new_page->va, true);
-        }
-        else {
-            new_page = palloc_get_page(PAL_USER);
-            page->writable = new_page->writable;
-            page->uninit.init = new_page->uninit.init;
-            page->uninit.type = new_page->uninit.type;
-            page->uninit.aux = new_page->uninit.aux;
-            page->uninit.page_initializer = new_page->uninit.page_initializer;
-        }
-        
     }
+    return true;
 }
 
 void
