@@ -8,6 +8,13 @@
 #include "include/lib/kernel/hash.h"
 #include "include/threads/mmu.h"
 
+/* implementation - pongpongie */
+static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
+static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+void page_table_kill(struct hash_elem *h, void* aux UNUSED);
+void hash_free (struct hash_elem *e, void *aux);
+struct list frame_table;
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -17,9 +24,10 @@ vm_init (void) {
 #ifdef EFILESYS  /* For project 4 */
 	pagecache_init ();
 #endif
-	register_inspect_intr ();
-	/* DO NOT MODIFY UPPER LINES. */
-	/* TODO: Your code goes here. */
+    register_inspect_intr ();
+    /* DO NOT MODIFY UPPER LINES. */
+    /* TODO: Your code goes here. */
+    list_init(&frame_table);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -40,11 +48,7 @@ page_get_type (struct page *page) {
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
 static struct frame *vm_evict_frame (void);
-/* implementation - pongpongie */
-static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
-static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
-struct list frame_table; // TODO: frame table 초기화 해주어야 함
-void hash_free (struct hash_elem *e, void *aux);
+
 
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
@@ -90,36 +94,33 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
         case VM_FILE:
             initializer = file_backed_initializer;
             break;
-        default:
-            return false;
         }
         uninit_new(p, upage, init, type, aux, initializer);
         p->writable = writable;
-        spt_insert_page(spt, p);
-	}
+        return spt_insert_page(spt, p);
+    }
 err:
-	return false;
+    return false;
 }
 
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt, void *va) {
-	struct page *page = NULL;
+    struct page *page = NULL;
     struct hash_elem *element;
-
+    
     // implementation - pongpongie
-    page->va = va;
+    page = (struct page *)malloc(sizeof(struct page));
+    page->va = pg_round_down(va);  // 왜 round_down?
     element = hash_find(&spt->spt_hash, &page->hash_elem);
-    if (element != NULL){
-        page = hash_entry(element, struct page, hash_elem);
-    }
-    return page;
+    // element 없으면 null처리
+    return element != NULL ? hash_entry(element, struct page, hash_elem) : NULL;
 }
 
 /* Insert PAGE into spt with validation. */
 bool
 spt_insert_page (struct supplemental_page_table *spt,
-		struct page *page) {
+        struct page *page) {
     struct page *p;
     struct page_elem *element;
     bool succ = true;
@@ -127,12 +128,13 @@ spt_insert_page (struct supplemental_page_table *spt,
     // implementation - pongpongie    
     // TODO: 인자로 주어진 spt에 페이지 구조체를 삽입한다.
     // TODO: 가상 주소가 spt에 존재하는지 확인해야한다.
-    if (!spt_find_page(&spt->spt_hash, page->va))
+    
+    element = hash_insert(&spt->spt_hash, &page->hash_elem);
+    if (element != NULL)
     {
         succ = false;
     }
-    hash_insert(&spt->spt_hash, &page->hash_elem);
-	return succ;
+    return succ;
 }
 
 void
@@ -144,11 +146,13 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	struct frame *victim = NULL;
-	/* TODO: The policy for eviction is up to you. */
+    struct frame *victim = NULL;
+    struct list_elem *element;
+    /* TODO: The policy for eviction is up to you. */
     // implementation - pongpongie
-    list_pop_front(&frame_table);
-	return victim;
+    element = list_pop_front(&frame_table);
+    victim = list_entry(element, struct frame, frame_elem);
+    return victim;
 }
 
 /* Evict one page and return the corresponding frame.
@@ -160,7 +164,9 @@ vm_evict_frame (void) {
 	/* TODO: swap out the victim and return the evicted frame. */
     // implementation - pongpongie
     if (swap_out(victim->page) == true);
+    {
         return victim;
+    }
 	return NULL;
 }
 
@@ -175,22 +181,27 @@ vm_evict_frame (void) {
  */
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
-	// implementation - pongpongie
+    struct frame *frame = NULL;
+    // implementation - pongpongie
 
-    frame->kva = NULL;  // 프레임 구조체 멤버 초기화
-    frame->page = NULL;
+    // frame->kva = NULL; // 구조체 멤버 초기화할 필요 없음
+    // frame->page = NULL;
 
+    frame = (struct frame *)malloc(sizeof(struct frame));
     frame->kva = palloc_get_page(PAL_USER);  // palloc으로 가져온 페이지에 프레임 할당
     if (frame->kva == NULL)
     {
-        vm_evict_frame();  // 페이지 쫓아내기
+        frame = vm_evict_frame();  // 페이지 쫓아내기
+        frame->page = NULL;
+        return frame;
+        // PANIC("todo");
     }
-    list_push_back(&frame_table, frame);  // 프레임 테이블에 프레임 추가
+    list_push_back(&frame_table, &frame->frame_elem);  // 프레임 테이블에 프레임 추가
+    frame->page = NULL;
     
-	ASSERT (frame != NULL);
-	ASSERT (frame->page == NULL);
-	return frame;
+    ASSERT (frame != NULL);
+    ASSERT (frame->page == NULL);
+    return frame;
 }
 
 /* Growing the stack. */
@@ -206,28 +217,37 @@ vm_handle_wp (struct page *page UNUSED) {
 /* Return true on success */
 bool
 vm_try_handle_fault (struct intr_frame *f, void *addr,
-		bool user, bool write, bool not_present) {
-	struct supplemental_page_table *spt = &thread_current ()->spt;
-	struct page *page = NULL;
-	/* TODO: Validate the fault */
-	// implementation - pongpongie
-    // printf("not present: %d, write : %d \n", write, not_present);
-    if (not_present == 1 && write == 1){
-        // printf("aaaaaaaa \n");
-        page = spt_find_page(&spt, addr);
-        // printf("writable &d\n", &page->writable);
-        if (page->writable == 1)
-        {
-            return vm_do_claim_page (page);
-        }
-        if (page->writable == 0)
+        bool user, bool write, bool not_present) {
+    struct supplemental_page_table *spt = &thread_current ()->spt;
+    struct page *page = NULL;
+    /* TODO: Validate the fault */
+    // implementation - pongpongie
+    
+    // addr이 NULL이라는 것은?
+    if (addr == NULL)
+    {
+        return false;
+    }
+
+    // addr이 user vadder이어야 하는 이유는?
+    if (is_kernel_vaddr(addr))
+    {
+        return false;
+    }
+    
+    // physical page가 존재하지 않는 경우
+    if (not_present)
+    {
+        page = spt_find_page(spt, addr);
+        if (page == NULL)
         {
             return false;
         }
-    }
-    if (not_present == 1 && write == 0){
-        page = spt_find_page(spt, addr);
-        return vm_do_claim_page(page);
+        if (!page->writable && write)   // 쓰기가능하지 않은데 쓰려고 한 경우
+        {
+            return false;
+        }
+        return vm_do_claim_page(page) ? true : false;
     }
     return false;
 }
@@ -249,31 +269,31 @@ vm_claim_page (void *va) {
     // implementation - pongpongi
     // 인자로 주어진 va에 페이지 할당
     // 그 페이지를 인자로 갖는 vm_do_claim_page 호출
-    va = palloc_get_page(PAL_USER);
-    page->va = va;
-	return vm_do_claim_page (page);
+    page = spt_find_page(&thread_current()->spt, va);
+    if (page == NULL)
+        return false;
+    return vm_do_claim_page (page);
 }
 
 /* Claim the PAGE and set up the mmu. */
-/* 페이지를 요정하고 mmu를 세팅한다. */
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame();
 
-	/* Set links */
-	frame->page = page;
-	page->frame = frame;
-
-	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+    /* Set links */
+    frame->page = page;
+    page->frame = frame;
+    
+    /* TODO: Insert page table entry to map page's VA to frame's PA. */
     // implementation - pongpongie
     // MMU 세팅; 가상 주소와 물리 주소를 매핑한 정보를 페이지 테이블에 추가하기
     struct thread *t = thread_current();
-    frame->kva = pml4_get_page(t->pml4, page);
-    if (frame->kva == NULL)
+    
+    if (pml4_get_page(t->pml4, page->va) != NULL)
         return false;
-    if (!pml4_set_page(t->pml4, page, frame->kva, page->writable))
+    if (!pml4_set_page(t->pml4, pg_round_down(page->va), frame->kva, page->writable))
         return false;
-	return swap_in (page, frame->kva);
+    return swap_in (page, frame->kva);
 }
 
 /* Initialize new supplemental page table */
@@ -286,7 +306,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt /* UNUSED */) 
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst,
-	struct supplemental_page_table *src) {
+    struct supplemental_page_table *src) {
     // implementation - pongpongie
 
     struct hash_iterator *i;
@@ -319,7 +339,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
     }
 }
 
-/* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
@@ -334,6 +353,12 @@ void hash_free (struct hash_elem *e, void *aux){
     const struct page *page = hash_entry(e, struct page, hash_elem);
     destroy(page);
     free(page);
+}
+
+void page_table_kill(struct hash_elem *h, void* aux UNUSED){
+	const struct page *_page = hash_entry(h, struct page, hash_elem);
+	destroy(_page);
+	free(_page);
 }
 
 unsigned
@@ -351,13 +376,4 @@ page_less (const struct hash_elem *a_,
   return a->va < b->va;
 }
 
-// /* Returns the page containing the given virtual address, or a null pointer if no such page exists. */
-// struct page *
-// page_lookup (const void *address) {
-//   struct page p;
-//   struct hash_elem *e;
-
-//   p.addr = address;
-//   e = hash_find (&pages, &p.hash_elem);
-//   return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
-// }
+/* vm.c: Generic interface for virtual memory objects. */
