@@ -8,6 +8,7 @@
 struct lock page_lock;
 struct list frame_list;
 
+
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -54,7 +55,7 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem;
 	bool writable;
-	int mapped_page_count;
+	int pgcount;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
