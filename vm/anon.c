@@ -25,7 +25,7 @@ vm_anon_init (void) {
 
 	// disk_sector_t *disk_capacity = (disk_sector_t*)malloc(4096);
 	// swap_disk->disk_capacity = disk_capacity;
-
+	// disk_sector_t size = disk_size(swap_disk);
 }	
 
 /* Initialize the file mapping */
@@ -36,7 +36,9 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	// page->anon.page = page; 
 
 	struct anon_page *anon_page = &page->anon;
-	// anon_page->ste->is_swapped = 0; 
+	// anon_page->page = page; 
+	// anon_page->is_swapped = 0; 
+	// list_push_back(&swap_table, &anon_page->swap_elem);
 }
 
 /* Swap in the page by read contents from the swap disk. */
@@ -51,7 +53,13 @@ anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 
 	// disk_write(&swap_disk, );
-	// list_push_back(&swap_table, &anon_page->ste->swap_elem);
+	// struct list_elem *e;
+	// for (e = list_front(&swap_table); e != list_end(&swap_table); e = list_next(e)){
+	// 	if (anon_page == list_entry(e, struct anon_page, swap_elem)){
+	// 		anon_page->is_swapped = 1;
+	// 		// disk_write(&swap_disk, )
+	// 	}
+	// }
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */

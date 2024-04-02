@@ -29,7 +29,7 @@ vm_init (void) {
 	/* TODO: Your code goes here. */
 	list_init(&frame_list);
 	lock_init(&page_lock);
-	// list_init(&swap_table); 
+	list_init(&swap_table); 
 }
 
 /* Get the type of the page. This function is useful if you want to know the

@@ -5,16 +5,17 @@ struct page;
 enum vm_type;
 
 //implementation
-// struct list swap_table;
+struct list swap_table;
 
 // struct swap_table_entry{
-//     struct list_elem swap_elem;
-//     bool is_swapped;
-//     void* va;
+
 // };
 
 struct anon_page {
-    // struct swap_table_entry *ste;
+    struct list_elem swap_elem;
+    bool is_swapped;
+    void* va;
+    struct page* page;
 };
 
 void vm_anon_init (void);

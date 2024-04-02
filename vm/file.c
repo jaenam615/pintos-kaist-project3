@@ -95,8 +95,6 @@ do_mmap (void *addr, size_t length, int writable,
 
 	void* return_address = addr;
 	
-    int total_pgcount = length <= PGSIZE ? 1 : length % PGSIZE ? length / PGSIZE + 1: length / PGSIZE; 
-
 	// 파일의 길이에 따라서 읽을 바이트 수 결정 
 	size_t read_bytes;
 	if (file_length(new_file) < length){
@@ -129,8 +127,6 @@ do_mmap (void *addr, size_t length, int writable,
 			return NULL;
 		}		
 
-		struct page *p = spt_find_page(&thread_current()->spt, return_address);
-        p->pgcount = total_pgcount;
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
@@ -172,8 +168,16 @@ do_munmap (void *addr)
 
     struct supplemental_page_table *spt = &thread_current()->spt;
     struct page *page = spt_find_page(spt, addr);
-    int count = page->pgcount;
-    for (int i = 0; i < count; i++)
+	//페이지 개수는 마지막 + PGSIZE를 해주어야 하는데, 이 때 중요한 건 file_length 자체가 PGSIZE단위이면 더해주면 안된다. 
+	
+	int page_count;
+	if (file_length(&page->file)%PGSIZE != 0){
+ 	    page_count = file_length(&page->file) + PGSIZE;
+	} else {
+		page_count = file_length(&page->file);
+	}
+	
+    for (int i = 0; i < page_count/PGSIZE; i++)
     {
         if (page)
             destroy(page);

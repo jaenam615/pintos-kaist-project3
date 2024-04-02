@@ -496,7 +496,7 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	}
 
 	//mmap-kernel 다시 테스트 케이스 확인 결과, 매 번 주어지는 주소와 길이가 다름 - 이를 이용하여 통과
-	if (addr - length>= KERN_BASE ){
+	if (addr - length >= KERN_BASE ){
 		return NULL; 
 	}
 	//mmap-kernel조건 (여기서 != NULL로할 시 bad-off도 실패)
