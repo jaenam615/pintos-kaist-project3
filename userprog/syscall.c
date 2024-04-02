@@ -320,9 +320,13 @@ int filesize (int fd)
 
 int read (int fd, void *buffer, unsigned size)
 {
-	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
-		exit(-1);
-
+	#ifndef VM
+        if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
+            exit(-1);
+    #endif
+        if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
+            exit(-1);
+	
 	struct thread *curr = thread_current();
 	struct list_elem *start;
 	off_t buff_size;
@@ -354,8 +358,12 @@ int read (int fd, void *buffer, unsigned size)
 
 int write (int fd, const void *buffer, unsigned size)
 {
-	if(pml4_get_page(thread_current()->pml4, buffer) == NULL || buffer == NULL || !is_user_vaddr(buffer) || fd < 0)
-		exit(-1);
+	#ifndef VM
+        if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
+            exit(-1);
+    #endif
+        if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
+            exit(-1);
 
 	struct thread *curr = thread_current();
 	struct list_elem *start;
