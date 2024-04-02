@@ -148,7 +148,12 @@ page_fault (struct intr_frame *f) {
 
 #ifdef VM
 	/* For project 3 and later. */
-	thread_current()->stack_pointer = f->rsp;
+	//page_fault내에서는 해당 값을 넣어주면 안된다. 시스템 콜에서 페이지 폴트를 호출할 경우, 여기서 받는 f는 다르기 때문이다! 
+	// thread_current()->stack_pointer = f->rsp;
+	//그렇다면, 아래와 같이 바꿔볼 수 있지 않을까 싶다:
+	if(user){
+		thread_current()->stack_pointer = f->rsp;
+	}
 
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present)){
 		return;

@@ -21,9 +21,12 @@ static const struct page_operations anon_ops = {
 void
 vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
-	swap_disk = disk_get(1:1);
+	swap_disk = disk_get(1,1); //swapdisk 로 쓸 때 1:1
 
-}
+	// disk_sector_t *disk_capacity = (disk_sector_t*)malloc(4096);
+	// swap_disk->disk_capacity = disk_capacity;
+
+}	
 
 /* Initialize the file mapping */
 bool
@@ -33,6 +36,7 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	// page->anon.page = page; 
 
 	struct anon_page *anon_page = &page->anon;
+	// anon_page->ste->is_swapped = 0; 
 }
 
 /* Swap in the page by read contents from the swap disk. */
@@ -45,6 +49,9 @@ anon_swap_in (struct page *page, void *kva) {
 static bool
 anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
+
+	// disk_write(&swap_disk, );
+	// list_push_back(&swap_table, &anon_page->ste->swap_elem);
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */

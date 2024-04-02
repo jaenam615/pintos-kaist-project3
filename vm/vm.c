@@ -29,6 +29,7 @@ vm_init (void) {
 	/* TODO: Your code goes here. */
 	list_init(&frame_list);
 	lock_init(&page_lock);
+	// list_init(&swap_table); 
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -414,7 +415,6 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 	hash_first(&i, &src->spt_hash);
 	while (hash_next(&i)) {
 		struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
-		struct page *dst_page = NULL;
 		// struct page *dst_page = palloc_get_page(PAL_USER);
 		if (src_page->frame == NULL) {
 			if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux)) {
@@ -443,9 +443,11 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 				file_lazy->read_bytes = src_page->file.read_bytes;
 				file_lazy->zero_bytes = src_page->file.zero_bytes;
 				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, lazy_load_segment, file_lazy)) {
+					free(file_lazy);
 					return false;
 				}
 				if (!vm_claim_page(src_page->va)) {
+					free(file_lazy);
 					return false;
 				}
 				break;
@@ -453,7 +455,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 			default:
 				break;
 			}
-			dst_page = spt_find_page(dst, src_page->va);
+			struct page *dst_page = spt_find_page(dst, src_page->va);
 			memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 		}
 	}

@@ -382,8 +382,6 @@ int read (int fd, void *buffer, unsigned size)
 	else
 	{
 		lock_acquire(&filesys_lock);
-
-
 		for (start = list_begin(&curr->fd_table); start != list_end(&curr->fd_table); start = list_next(start))
 		{
 			struct file_descriptor *read_fd = list_entry(start, struct file_descriptor, fd_elem);
@@ -399,6 +397,7 @@ int read (int fd, void *buffer, unsigned size)
 				}
 				buff_size = file_read(read_fd->file, buffer, size);
 			}
+			
 		}
 		lock_release(&filesys_lock);
 	}
