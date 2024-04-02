@@ -209,8 +209,13 @@ vm_get_frame (void) {
 }
 
 /* Growing the stack. */
+// 매개변수로 들어온 addr에 대한 조건들을 다 체크하고 호출될 것이기 때문에, 늘려주기만 하면 될듯?
+// rsp를 어떻게 가져올 것인가? - stack_pointer를 thread 구조체에 추가함
 static void
-vm_stack_growth (void *addr UNUSED) {
+vm_stack_growth (void *addr) {
+    // implementation - pongpongie
+
+    vm_alloc_page(VM_ANON, pg_round_down(addr), true);
 }
 
 /* Handle the fault on write_protected page */
@@ -226,14 +231,14 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
     struct page *page = NULL;
     /* TODO: Validate the fault */
     // implementation - pongpongie
-    
-    // addr이 NULL이라는 것은?
+    // TODO: 스택 증가를 확인하는 로직 추가
+    // TODO: 스택을 증가시켜도 되는 경우인지 아닌지 확인
+    // TODO: 만약 스택을 증가시켜도 되는 경우라면, addr로 vm_stack_growth 호출
     if (addr == NULL)
     {
         return false;
     }
 
-    // addr이 user vadder이어야 하는 이유는?
     if (is_kernel_vaddr(addr))
     {
         return false;
@@ -242,6 +247,39 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
     // physical page가 존재하지 않는 경우
     if (not_present)
     {
+        struct thread *t = thread_current();
+        void *rsp;
+        if (user)  // page fault가 user mode에서 발생한 경우
+        {
+            rsp = f->rsp; // rsp는 매개변수인 intr_frame 구조체에서 호출하면 됨
+        }
+
+        if (!user) // page fault가 kernel mode에서 발생한 경우
+        {
+            rsp = t->stack_pointer; // rsp는 유저 모드에서 커널 모드로 전환 이전의 값을 저장한 stack_pointer을 사용해야 유저 스택의 값을 가리킬 수 있음
+        }
+
+        if (addr <= USER_STACK && USER_STACK - (1 << 20) <= addr)
+        {
+            if (addr >= rsp)
+            {
+                vm_stack_growth(addr);
+                return true;
+            }
+            if (rsp - 8 == addr)
+            {
+                vm_stack_growth(addr);
+                return true;
+            }
+            if (addr < rsp)
+            {
+                return false;
+            }
+        }
+        else if (addr <= USER_STACK - (1 << 20))
+        {
+            return false;
+        }
         page = spt_find_page(spt, addr);
         if (page == NULL)
         {

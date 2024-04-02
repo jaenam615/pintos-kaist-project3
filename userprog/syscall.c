@@ -131,6 +131,9 @@ syscall_handler (struct intr_frame *f) {
 		printf ("third condition\n");
 		thread_exit();
 	}
+    #ifdef VM
+    thread_current()->stack_pointer = f->rsp;
+    #endif
 
 	// addr = f->R.rsi;
 	
