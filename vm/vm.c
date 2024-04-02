@@ -2,6 +2,7 @@
 
 #include "threads/malloc.h"
 #include "vm/vm.h"
+#include "vm/file.h"
 #include "vm/inspect.h"
 #include "list.h"
 #include "include/threads/vaddr.h"
@@ -60,7 +61,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
-
+;
 
 	/* Check wheter the upage is already occupied or not. */
 	//upage라는 주소를 갖는 페이지는 존재하지 않아야 한다 - 여기서 upage는 새로 만들 페이지의 user virtual address이다
@@ -119,7 +120,7 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt, void *va) {
 	struct page *_page;
 	// /* TODO: Fill this function. */
-	
+
 	//SPT에 존재하는 페이지를 찾아줌
 	//더미 페이지를 할당하고 해당 페이지의 VA를 우리가 찾고자 하는 VA로 설정
 	_page = (struct page*)malloc(sizeof(struct page));
@@ -161,7 +162,6 @@ spt_insert_page (struct supplemental_page_table *spt,
 		return true;
 	} 
 	return false;
-
 }
 
 
@@ -216,11 +216,13 @@ vm_get_frame (void) {
 	//실패 시에는 SWAP을 해야하기 때문에 evict frame으로 일단 넣어둔다
 	if (frame->kva == NULL){	
 		// PANIC("todo");
+		palloc_free_page(frame->kva);
+		free(frame);
 		frame = vm_evict_frame();
 		frame->page = NULL;
 		return frame;
 	} 
-	
+
 	//initialize its members
 	//프레임의 원소들을 초기화시켜주고, frame_list에 넣어서 이후 관리가 수월하도록 한다
 	// frame->kva = _kva;
@@ -240,8 +242,10 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr) {
 	//할당 해주고, 스택 포인터를 아래로 addr만큼 낮추어라
-	if (vm_alloc_page_with_initializer(VM_ANON, addr, true, NULL, NULL)){
+	if (vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, addr, true, NULL, NULL)){
 		thread_current()->stack_pointer = addr;
+		//확인해야함
+		thread_current()->stack_bottom -= PGSIZE;
 	}
 }
 
@@ -264,21 +268,27 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		return false;
 	}
 
-
 	if(not_present){
 		struct thread* t = thread_current();
-		// lock_acquire(&page_lock);
 		
-		void* ptr = (user) ? f->rsp : thread_current()->stack_pointer;
-		
-		//스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 + USER STACK스택 영역이면
-		if (ptr-sizeof(void*) <= addr && addr <= USER_STACK-PGSIZE && addr > 0x400000 + sizeof(void*)){
-			vm_stack_growth(pg_round_down(addr));
+		// 사용자 프로세스일 경우, 인터럽트 프레임으로 스택의 크기가 전달되지만, 아닐 경우에는 별도로 저장된 값을 가져와야 한다. 
+		// 이 값은 syscall에서 사용자-> 커널로 바뀔 때 저장이 가능하다.
+		void* ptr;
+		if (user){
+			ptr = f->rsp;
 		}
-		
-		
+		if (!user){
+			ptr = t->stack_pointer;
+		}
+	
+		//User_stack의 최대 크기는 1 메가바이트 (1<<20)  && 스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 && USER STACK스택 영역이면
+		if ( (USER_STACK - (1 << 20) <= ptr - sizeof(void*) && ptr - sizeof(void*) == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= ptr && ptr <= addr && addr <= USER_STACK)){
+			// if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
+				vm_stack_growth(pg_round_down(addr));	
+			// }
+		}
+
 		page = spt_find_page(spt , addr);
-		// lock_release(&page_lock);
 
 		if(page == NULL){
 			// printf("page is null\n");
@@ -425,14 +435,21 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 				}
 				break;
 			case VM_FILE:
+			{
 				// if (!vm_alloc_page(VM_ANON, src_page->va, src_page->writable)) {
-				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, NULL, NULL)) {
+				struct lazy* file_lazy = (struct lazy*)malloc(sizeof(struct lazy));
+				file_lazy->file = src_page->file.file;
+				file_lazy->ofs = src_page->file.ofs;
+				file_lazy->read_bytes = src_page->file.read_bytes;
+				file_lazy->zero_bytes = src_page->file.zero_bytes;
+				if (!vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va, src_page->writable, lazy_load_segment, file_lazy)) {
 					return false;
 				}
 				if (!vm_claim_page(src_page->va)) {
 					return false;
 				}
 				break;
+			}
 			default:
 				break;
 			}

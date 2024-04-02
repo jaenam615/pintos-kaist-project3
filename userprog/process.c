@@ -33,7 +33,8 @@ static void initd (void *f_name);
 
 void argument_stack(char** argv, int argc, struct intr_frame *if_);
 struct thread *get_thread_from_tid(tid_t thread_id);
-
+bool
+lazy_load_segment (struct page *page, void *aux);
 struct parent_info
 {
 	struct thread *parent;
@@ -817,7 +818,7 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
@@ -834,6 +835,9 @@ lazy_load_segment (struct page *page, void *aux) {
 	// lock_try_acquire(&filesys_lock);
 	if(file_read(lazy->file, page->frame->kva, lazy->read_bytes) != (int) lazy->read_bytes){
 		palloc_free_page(page->frame->kva);	
+		//added- may remove if necessary
+
+		free(aux);
 		return false;
 		
 	}
@@ -843,7 +847,10 @@ lazy_load_segment (struct page *page, void *aux) {
 	start = page->frame->kva + lazy->read_bytes;
 	memset(start,0,lazy->zero_bytes);
 
-	file_seek(lazy->file,lazy->ofs);
+	// file_seek(lazy->file,lazy->ofs);
+
+	//added- may remove if necessary
+	// free(aux);
 	return true;
 
 }
@@ -922,6 +929,7 @@ setup_stack (struct intr_frame *if_) {
 		if (vm_claim_page(stack_bottom)){
 			success = true; 
 			if_->rsp = USER_STACK;
+			thread_current()->stack_bottom = stack_bottom;
 		}
 	}
 	return success;
