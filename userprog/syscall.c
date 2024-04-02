@@ -87,23 +87,6 @@ struct file_descriptor *find_file_descriptor(int fd) {
 	return NULL;
 }
 
-void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write){
-	if (buffer <= USER_STACK && buffer >= rsp)
-		return;
-	
-	for(int i=0; i<size; i++){
-		if(buffer+i == NULL || is_kernel_vaddr(buffer+i)){
-			exit(-1);
-		} else {
-        	struct page* page = spt_find_page(&thread_current()->spt, buffer + i);
-			if(page == NULL)
-            	exit(-1);
-        	if(to_write == true && page->writable == false)
-            	exit(-1);
-		}
-
-    }
-}
 
 /* An open file. */
 struct file {
@@ -135,10 +118,11 @@ syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 
 	struct thread *t = thread_current();
+
 	//페이지 폴트가 커널에서 발생할 경우 intr_frame에서 프로그램의 스택 포인터를 가져오지 못한다
 	//초기 커널모드로 전환할 때 스택 포인터를 쓰레드 구조체에 저장해준다.
-
 	t->stack_pointer = f->rsp;
+
 	t->tf = *f;
 
 	// int size = palloc_init();
@@ -200,12 +184,10 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_READ:
-		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
 		f->R.rax = read(f->R.rdi,f->R.rsi,f->R.rdx);
 		break;
 
 	case SYS_WRITE:
-		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
 		f->R.rax = write(f->R.rdi,f->R.rsi,f->R.rdx);
 		break;
 
@@ -373,12 +355,15 @@ int filesize (int fd)
 
 int read (int fd, void *buffer, unsigned size)
 {
+
+
 #ifndef VM
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
 		exit(-1);
 #endif
 
-	if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
+
+	if(buffer == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || buffer > USER_STACK) 
 		exit(-1);
 
 	struct thread *curr = thread_current();
@@ -389,7 +374,7 @@ int read (int fd, void *buffer, unsigned size)
 	{
 		return input_getc();
 	} 
-	else if (fd == NULL || fd == 1)
+	else if (fd < 0 || fd == NULL || fd == 1)
 	{
 		exit(-1);
 	}
@@ -422,12 +407,13 @@ int read (int fd, void *buffer, unsigned size)
 
 int write (int fd, const void *buffer, unsigned size)
 {
-
+	if(buffer == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || buffer > USER_STACK) 
+		exit(-1);
 #ifndef VM
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
 		exit(-1);
 #endif
-	if(buffer == NULL || !is_user_vaddr(buffer) || fd < 0) 
+	if(buffer == NULL || !is_user_vaddr(buffer)) 
 		exit(-1);
 
 	struct thread *curr = thread_current();
@@ -440,7 +426,7 @@ int write (int fd, const void *buffer, unsigned size)
 		// putbuf 함수는 buffer에 입력된 데이터를 size만큼 화면에 출력하는 함수.
 		// 이후 버퍼의 크기 -> size를 반환한다.
 	}
-	else if (fd < 0 || fd == NULL)
+	else if (fd <= 0 || fd == NULL)
 	{
 		exit(-1);
 	}
@@ -497,16 +483,17 @@ unsigned tell (int fd)
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 
-	// 주소 유효성 검사
+	// 주소 유효성 검사 - bad등의 테스트케이스 예외처리
 	if(addr == 0 || addr == NULL) 
 		return NULL;	
 
-	if(offset % PGSIZE != 0){
-		return NULL; 
-	}
-
 	if (addr != pg_round_down(addr) || offset != pg_round_down(offset) || is_kernel_vaddr(addr)){
 		return NULL;
+	}
+
+	// offset이 PGSIZE에 알맞게 align 되어있는지 - off 등의 테스트케이스 예외처리
+	if(offset % PGSIZE != 0){
+		return NULL; 
 	}
 
 	//mmap-kernel 다시 테스트 케이스 확인 결과, 매 번 주어지는 주소와 길이가 다름 - 이를 이용하여 통과
@@ -521,13 +508,15 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	if(!is_user_vaddr(pg_round_down(addr)) || !is_user_vaddr(pg_round_up(addr))){
 		return NULL;
 	}
+
 	// if (pml4_get_page(thread_current()->pml4, pg_round_down(addr)) || pml4_get_page(thread_current()->pml4, pg_round_up(addr)))
 	// 	return NULL;
-	// 읽고자 하는 길이 유효성 검사 & 주소를 가지고 있는 페이지가 SPT에 전재하는지 확인(유효한 페이지인가)
+	// 읽고자 하는 길이 유효성 검사 
 	if (length <= 0){
 		return NULL;
 	}
 
+	//이 시점에 SPT에 있으면 안된다 
 	if (spt_find_page(&thread_current()->spt, addr)){
 		return NULL;
 	}

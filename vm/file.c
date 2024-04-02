@@ -68,9 +68,7 @@ file_backed_swap_out (struct page *page) {
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 // static void
-// file_backed_destroy (struct page *page) {
-// 	struct file_page *file_page UNUSED = &page->file;
-// }
+
 static void
 file_backed_destroy (struct page *page) 
 {
@@ -89,6 +87,7 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 
+	//똑같은 파일을 그대로 쓰면 외부에서 해당 파일을 close하게 될 수도 있는데, 이 때 문제가 생긴다
 	struct file* new_file = file_reopen(file);
 	if(new_file == NULL){
 		return NULL;
@@ -98,6 +97,7 @@ do_mmap (void *addr, size_t length, int writable,
 	
     int total_page_count = length <= PGSIZE ? 1 : length % PGSIZE ? length / PGSIZE + 1: length / PGSIZE; 
 
+	// 파일의 길이에 따라서 읽을 바이트 수 결정 
 	size_t read_bytes;
 	if (file_length(new_file) < length){
 		read_bytes = file_length(new_file);
@@ -111,6 +111,7 @@ do_mmap (void *addr, size_t length, int writable,
 	ASSERT (offset % PGSIZE == 0);
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 
+	//이 부분이 length로 되어있었는데, 아래를 load_segment와 같게 했기 때문에 page_read_bytes만 바뀌고 length가 안바뀌었다 - 무한루프를 돌았는데 해결
 	while (read_bytes > 0 || zero_bytes > 0) {
 			/* Do calculate how to fill this page.
 			* We will read PAGE_READ_BYTES bytes from FILE
@@ -170,47 +171,14 @@ do_munmap (void *addr)
 {
 
     struct supplemental_page_table *spt = &thread_current()->spt;
-    struct page *p = spt_find_page(spt, addr);
-    int count = p->mapped_page_count;
+    struct page *page = spt_find_page(spt, addr);
+    int count = page->mapped_page_count;
     for (int i = 0; i < count; i++)
     {
-        if (p)
-            destroy(p);
+        if (page)
+            destroy(page);
         addr += PGSIZE;
-        p = spt_find_page(spt, addr);
+        page = spt_find_page(spt, addr);
     }
 }
 
-// bool
-// lazy_load_segment_for_file (struct page *page, void *aux) {
-// 	/* TODO: Load the segment from the file */
-// 	/* TODO: This called when the first page fault occurs on address VA. */
-// 	/* TODO: VA is available when calling this function. */
-	
-// 	struct lazy *lazy = (struct lazy*)aux;
-
-// 	file_seek(lazy->file, lazy->ofs);
-// 	//file에서 read_bytes만큼 buf로 read한다
-// 	/* Load this page. */
-// 	// lock_try_acquire(&filesys_lock);
-// 	if(file_read(lazy->file, page->frame->kva, lazy->read_bytes) != (int) lazy->read_bytes){
-// 		palloc_free_page(page->frame->kva);	
-// 		//added- may remove if necessary
-// 		free(aux);
-// 		return false;
-		
-// 	}
-
-// 	// lock_release(&filesys_lock);
-// 	//read_bytes로 설정한 이후 부분부터 zero_bytes만큼 0으로 채운다
-// 	void* start;
-// 	start = page->frame->kva + lazy->read_bytes;
-// 	memset(start,0,lazy->zero_bytes);
-
-// 	//added- may remove if necessary
-// 	// free(aux);
-	
-// 	// file_seek(lazy->file,lazy->ofs);
-// 	return true;
-
-// }

@@ -270,36 +270,25 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 
 	if(not_present){
 		struct thread* t = thread_current();
-		// lock_acquire(&page_lock);
 		
-		void* ptr = f->rsp;
+		// 사용자 프로세스일 경우, 인터럽트 프레임으로 스택의 크기가 전달되지만, 아닐 경우에는 별도로 저장된 값을 가져와야 한다. 
+		// 이 값은 syscall에서 사용자-> 커널로 바뀔 때 저장이 가능하다.
+		void* ptr;
+		if (user){
+			ptr = f->rsp;
+		}
 		if (!user){
 			ptr = t->stack_pointer;
 		}
-		// //확인해야함
-		// if ((1 << 20) < (USER_STACK - ((uint64_t )t->stack_bottom))){
-		// 	return false;
-		// }
-		// //확인해야함
-
 	
-
-		//스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 + USER STACK스택 영역이면
-		// if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
-		// 	vm_stack_growth(pg_round_down(addr));
-		// }
-	    // if (USER_STACK - (1 << 20) <= ptr - 8 && ptr - 8 == addr && addr <= USER_STACK)
-        //     vm_stack_growth(addr);
-        // else if (USER_STACK - (1 << 20) <= ptr && ptr <= addr && addr <= USER_STACK)
-        //     vm_stack_growth(addr);		
-
+		//User_stack의 최대 크기는 1 메가바이트 (1<<20)  && 스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 && USER STACK스택 영역이면
 		if ( (USER_STACK - (1 << 20) <= ptr - sizeof(void*) && ptr - sizeof(void*) == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= ptr && ptr <= addr && addr <= USER_STACK)){
 			// if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
 				vm_stack_growth(pg_round_down(addr));	
 			// }
 		}
+
 		page = spt_find_page(spt , addr);
-		// lock_release(&page_lock);
 
 		if(page == NULL){
 			// printf("page is null\n");
