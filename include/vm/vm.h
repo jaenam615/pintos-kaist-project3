@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
+#include "devices/disk.h"
 // #include "threads.h"
 
 struct lock page_lock;
@@ -74,6 +75,13 @@ struct frame {
 
 	//IMPLEMENTATION
 	struct list_elem frame_elem;
+};
+
+struct sector{
+	struct page *page;
+	uint32_t slot;
+	struct list_elem swap_elem; 
+	bool occupied;
 };
 
 /* The function table for page operations.

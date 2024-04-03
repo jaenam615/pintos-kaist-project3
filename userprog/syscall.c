@@ -125,9 +125,6 @@ syscall_handler (struct intr_frame *f) {
 
 	t->tf = *f;
 
-	// int size = palloc_init();
-	
-	//주소가 유호한지 확인
 	// if(!is_user_vaddr(f->rsp)){
 	// 	printf("isnotvaddr\n");
 	// 	thread_exit();
@@ -144,8 +141,6 @@ syscall_handler (struct intr_frame *f) {
 	// 	thread_exit();
 	// }
 
-	// addr = f->R.rsi;
-	
 	switch(f->R.rax){
 	case SYS_HALT:
 		halt();
@@ -362,9 +357,9 @@ int read (int fd, void *buffer, unsigned size)
 		exit(-1);
 #endif
 
-
-	if(buffer == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || buffer > USER_STACK) 
+	if(buffer == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || buffer > USER_STACK){
 		exit(-1);
+	}
 
 	struct thread *curr = thread_current();
 	struct list_elem *start;
@@ -406,14 +401,14 @@ int read (int fd, void *buffer, unsigned size)
 
 int write (int fd, const void *buffer, unsigned size)
 {
-	if(buffer == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || buffer > USER_STACK) 
+
+	if(buffer == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || buffer > USER_STACK){
 		exit(-1);
+	}
 #ifndef VM
 	if(pml4_get_page(thread_current()->pml4, buffer) == NULL) 
 		exit(-1);
 #endif
-	if(buffer == NULL || !is_user_vaddr(buffer)) 
-		exit(-1);
 
 	struct thread *curr = thread_current();
 	struct list_elem *start;
@@ -485,7 +480,7 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// 주소 유효성 검사 - bad등의 테스트케이스 예외처리
 	if(addr == 0 || addr == NULL) 
 		return NULL;	
-
+	
 	if (addr != pg_round_down(addr) || offset != pg_round_down(offset) || is_kernel_vaddr(addr)){
 		return NULL;
 	}
