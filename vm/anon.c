@@ -104,7 +104,7 @@ anon_swap_out (struct page *page) {
 	// }
 	struct list_elem *e;
 	struct sector *se;
-;
+
 	lock_acquire(&anon_lock);
 	for (e = list_begin(&swap_table); e != list_end(&swap_table); e = list_next(e)){
 		se = list_entry(e, struct sector, swap_elem);
@@ -149,6 +149,7 @@ anon_destroy (struct page *page) {
 		se = list_entry(e, struct sector, swap_elem);
 		if (se->slot == anon_page->slot)
 		{
+			se->occupied = false; 
 			se->page = NULL;
 			break;
 		}
