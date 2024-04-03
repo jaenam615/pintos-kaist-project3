@@ -4,6 +4,7 @@
 #include "threads/mmu.h"
 #include "userprog/process.h"
 #include "userprog/syscall.h"
+#include "lib/string.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -43,10 +44,12 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page = &page->file;
+	struct lazy* aux = (struct lazy*)page->uninit.aux;
 
 	lock_acquire(&filesys_lock);
-	bool result = lazy_load_segment(page, file_page);
+	bool result = lazy_load_segment(page, aux);
 	lock_release(&filesys_lock);
+	
 	return result;
 }
 
@@ -62,7 +65,7 @@ file_backed_swap_out (struct page *page) {
 
 	if(pml4_is_dirty(thread_current()->pml4,page->va)){
 		file_write_at(file,page->va, aux->read_bytes, aux->ofs);
-		// file_write_at(file_page->file,page->va, file_page->read_bytes, file_page->ofs);
+		file_write_at(file_page->file,page->va, file_page->read_bytes, file_page->ofs);
 		// page->va == frame->page->kva (page->va 있는 정보나 frame에 있는 정보나 같다.)
 		pml4_set_dirty(thread_current()->pml4, page->va, false);
 	}
@@ -79,9 +82,12 @@ static void
 file_backed_destroy (struct page *page) 
 {
 	struct file_page *file_page = &page->file;
+		struct lazy* aux = (struct lazy*)page->uninit.aux;
+	struct file * file = aux->file;
 	 if (pml4_is_dirty(thread_current()->pml4, page->va))
     {
-        file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->ofs);
+		file_write_at(file,page->va, aux->read_bytes, aux->ofs);
+        // file_write_at(file_page, page->va, file_page->read_bytes, file_page->ofs);
         pml4_set_dirty(thread_current()->pml4, page->va, 0);
     }
     pml4_clear_page(thread_current()->pml4, page->va);

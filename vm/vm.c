@@ -166,6 +166,8 @@ spt_insert_page (struct supplemental_page_table *spt,
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
+	hash_delete(&spt->spt_hash, &page->hash_elem);
+
 	vm_dealloc_page (page);
 	return true;
 }
@@ -189,13 +191,16 @@ vm_get_victim (void) {
 		while(1){
 			e = list_pop_front(&frame_list);
 			victim = list_entry(e, struct frame, frame_elem);
+			if(victim->page == NULL){
+				return victim; 
+			}
+
 			if (pml4_is_accessed(thread_current()->pml4, victim->page->va)){
 				pml4_set_accessed(thread_current()->pml4, victim->page->va, false);
 				lock_acquire(&page_lock);
 				list_push_back(&frame_list,e);
 				lock_release(&page_lock);
 			} else {
-				pml4_set_accessed(thread_current()->pml4, victim->page->va, true);
 				lock_acquire(&page_lock);
 				list_push_back(&frame_list, e); 
 				lock_release(&page_lock);
@@ -205,6 +210,7 @@ vm_get_victim (void) {
 	}
 	return victim;
 }
+
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
@@ -231,19 +237,19 @@ vm_get_frame (void) {
 	//IMPLEMENTATION
 
 	//allocate frame
-	frame = (struct frame*)malloc(sizeof(struct frame));
 	//PAL_USER를 사용해서 실제 물리메모리의 USER_POOL에서부터 물리 프레임으로 정의된 Kernel Virtual Address를 반환받는다 
-	frame->kva = palloc_get_page(PAL_USER);
+	void* kva = palloc_get_page(PAL_USER);
 	//실패 시에는 SWAP을 해야하기 때문에 evict frame으로 일단 넣어둔다
-	if (frame->kva == NULL){	
+	if (kva == NULL){	
 		// PANIC("todo");
-		palloc_free_page(frame->kva);
-		free(frame);
 		frame = vm_evict_frame();
 		//clock_algorithm
 		frame->page = NULL;
 		return frame;
 	} 
+	frame = (struct frame*)malloc(sizeof(struct frame));
+	frame->kva = kva; 
+	frame->page = NULL; 
 
 	//initialize its members
 	//프레임의 원소들을 초기화시켜주고, frame_list에 넣어서 이후 관리가 수월하도록 한다
@@ -252,7 +258,6 @@ vm_get_frame (void) {
 	//clock_algorithm
 	list_push_back(&frame_list, &frame->frame_elem);
 	lock_release(&page_lock);
-	frame->page = NULL; 
 
 
 	ASSERT (frame != NULL);

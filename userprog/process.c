@@ -837,8 +837,8 @@ lazy_load_segment (struct page *page, void *aux) {
 	if(file_read(lazy->file, page->frame->kva, lazy->read_bytes) != (int) lazy->read_bytes){
 		palloc_free_page(page->frame->kva);	
 		//added- may remove if necessary
-
-		free(aux);
+		
+		// free(aux);
 		return false;
 		
 	}
