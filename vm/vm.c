@@ -29,7 +29,6 @@ vm_init (void) {
 	/* TODO: Your code goes here. */
 	list_init(&frame_list);
 	lock_init(&page_lock);
-	// list_init(&swap_table); 
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -62,7 +61,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
-;
 
 	/* Check wheter the upage is already occupied or not. */
 	//upage라는 주소를 갖는 페이지는 존재하지 않아야 한다 - 여기서 upage는 새로 만들 페이지의 user virtual address이다
@@ -179,9 +177,31 @@ vm_get_victim (void) {
 	 /* TODO: The policy for eviction is up to you. */
 	//퇴출정책에 의거하여 퇴출시킬 프레임을 반환한다
 	//일단은 FIFO로 구현
+	// list_push_back으로 도로 넣어주지 않아서 프레임이 꽉 차있어도 프레임을 퇴출 및 받아올 방법이 없었다 - swap_anon
+	// if(!list_empty(&frame_list)){
+	// 	struct list_elem *e = list_pop_front(&frame_list);
+	// 	victim = list_entry(e, struct frame, frame_elem);
+	// 	list_push_back(&frame_list, &victim->frame_elem);
+	// }
+
 	if(!list_empty(&frame_list)){
-		struct list_elem *e = list_pop_front(&frame_list);
-		victim = list_entry(e, struct frame, frame_elem);
+		struct list_elem *e;
+		while(1){
+			e = list_pop_front(&frame_list);
+			victim = list_entry(e, struct frame, frame_elem);
+			if (pml4_is_accessed(thread_current()->pml4, victim->page->va)){
+				pml4_set_accessed(thread_current()->pml4, victim->page->va, false);
+				lock_acquire(&page_lock);
+				list_push_back(&frame_list,e);
+				lock_release(&page_lock);
+			} else {
+				pml4_set_accessed(thread_current()->pml4, victim->page->va, true);
+				lock_acquire(&page_lock);
+				list_push_back(&frame_list, e); 
+				lock_release(&page_lock);
+				break;
+			} 
+		}
 	}
 	return victim;
 }
@@ -220,6 +240,7 @@ vm_get_frame (void) {
 		palloc_free_page(frame->kva);
 		free(frame);
 		frame = vm_evict_frame();
+		//clock_algorithm
 		frame->page = NULL;
 		return frame;
 	} 
@@ -228,6 +249,7 @@ vm_get_frame (void) {
 	//프레임의 원소들을 초기화시켜주고, frame_list에 넣어서 이후 관리가 수월하도록 한다
 	// frame->kva = _kva;
 	lock_acquire(&page_lock);
+	//clock_algorithm
 	list_push_back(&frame_list, &frame->frame_elem);
 	lock_release(&page_lock);
 	frame->page = NULL; 
@@ -243,10 +265,10 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr) {
 	//할당 해주고, 스택 포인터를 아래로 addr만큼 낮추어라
-	if (vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, addr, true, NULL, NULL)){
-		thread_current()->stack_pointer = addr;
-		//확인해야함
-		thread_current()->stack_bottom -= PGSIZE;
+	// vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, addr, true, NULL, NULL)
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true)){
+
+		// thread_current()->stack_bottom -= PGSIZE;
 	}
 }
 
@@ -266,6 +288,7 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 	/* TODO: Your code goes here */
 
 	if (is_kernel_vaddr(addr) || addr == NULL){
+
 		return false;
 	}
 
@@ -274,6 +297,7 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		
 		// 사용자 프로세스일 경우, 인터럽트 프레임으로 스택의 크기가 전달되지만, 아닐 경우에는 별도로 저장된 값을 가져와야 한다. 
 		// 이 값은 syscall에서 사용자-> 커널로 바뀔 때 저장이 가능하다.
+
 		void* ptr;
 		if (user){
 			ptr = f->rsp;
@@ -281,12 +305,17 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		if (!user){
 			ptr = t->stack_pointer;
 		}
-	
+
+		//swap-anon - 한 번은 제대로 늘어나지만, 두 번쨰로 늘려야 하는 경우에 안늘려서 지금 문제가 생긴다! 확인해보자. 
+
+		// vm_stack_growth(pg_round_down(addr));	
+
 		//User_stack의 최대 크기는 1 메가바이트 (1<<20)  && 스택 포인터에서 한 주소만큼 낮춰서 addr를 넣을 수 있다면 && USER STACK스택 영역이면
-		if ( (USER_STACK - (1 << 20) <= ptr - sizeof(void*) && ptr - sizeof(void*) == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= ptr && ptr <= addr && addr <= USER_STACK)){
-			// if (ptr-sizeof(void*) <= addr && addr <= USER_STACK && addr >= (USER_STACK - 1000000)){
+		if ((USER_STACK - (1 << 20) <= ptr && addr < USER_STACK && USER_STACK - (1 <<20) < addr)){
+			if (ptr - sizeof(void*) == addr || ptr <= addr){
+				// printf("chk here\n");
 				vm_stack_growth(pg_round_down(addr));	
-			// }
+			}
 		}
 
 		page = spt_find_page(spt , addr);
@@ -375,39 +404,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 }
 
 /* Copy supplemental page table from src to dst */
-// bool
-// supplemental_page_table_copy (struct supplemental_page_table *dst,
-// 		struct supplemental_page_table *src) {
-	
-// 	//IMPLEMENTATION
-// 	//get first entry
-// 	struct hash_iterator i;
-// 	hash_first(&i, &src->spt_hash);
-// 	bool final = false;
-// 	//iterate through entries and copy them 
-// 	while (hash_next (&i))
-// 	{
-// 		struct page *src_p = hash_entry (hash_cur (&i), struct page, hash_elem);
-// 		struct page *dst_p;
 
-// 		//복사할 것들 - vm_alloc_page_with_initializer가 받는 인자들 부모로부터 복사
-// 		enum vm_type type = page_get_type(src_p);
-// 		bool writable = src_p->writable;
-// 		vm_initializer *init = src_p->uninit.init;
-// 		void * aux = src_p->uninit.aux;
-
-// 		if (VM_TYPE(type) == VM_UNINIT){
-// 			final = vm_alloc_page_with_initializer(type, src_p->va, writable, init, aux);
-// 		}else {
-// 			if(vm_alloc_page_with_initializer(type, src_p->va, writable, init, aux)){
-// 				if(vm_claim_page(src_p->va)){
-// 					memcpy(src_p, dst_p, PGSIZE);
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return final; 
-// }
 bool supplemental_page_table_copy(struct supplemental_page_table *dst,
 		struct supplemental_page_table *src) {
 	struct hash_iterator i;

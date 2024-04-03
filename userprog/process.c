@@ -431,6 +431,7 @@ process_cleanup (void) {
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
 	// free(&curr->spt.spt_hash.buckets);
+	// return;
 #endif
 	uint64_t *pml4;
 	/* Destroy the current process's page directory and switch back
@@ -930,6 +931,7 @@ setup_stack (struct intr_frame *if_) {
 			success = true; 
 			if_->rsp = USER_STACK;
 			thread_current()->stack_bottom = stack_bottom;
+			// thread_current()->stack_pointer = stack_bottom;
 		}
 	}
 	return success;
